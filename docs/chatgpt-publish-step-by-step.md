@@ -5,7 +5,7 @@
 1. Otevřete tento workspace.
 2. Spusťte:
    `npm install`
-3. Zkopírujte `.env.example` na `.env`.
+3. Zkopírujte `.env.production.example` na `.env`.
 4. Vygenerujte encryption key:
    `node scripts/generate-app-key.mjs`
 5. Doplňte `APP_BASE_URL`, `SUPPORT_EMAIL`, reviewer credentials a Cloudflare hostname.
@@ -32,6 +32,7 @@
    `npm run build`
 3. Připravte `.env`.
 4. Nasaďte systemd služby a Cloudflare tunnel podle `docs/home-server-cloudflare-deploy.md`.
+5. Spusťte `scripts/verify-production.sh https://vase-domena`.
 
 ## 4. Seed reviewer účtu
 
@@ -56,12 +57,14 @@
 ## 6. Submission balíček
 
 1. Vyplňte `submission/chatgpt-app-metadata.json`.
+2. Zkopírujte texty z `submission/app-directory-listing.md`.
+3. Zkontrolujte `submission/fill-before-submit.md`.
 2. Připravte screenshoty:
    - login
    - workspace dashboard
    - přidání Flexi connection
    - ChatGPT tool run
-3. Přiložte reviewer login a walkthrough.
+4. Přiložte reviewer login a walkthrough z `submission/reviewer-guide.md`.
 
 ## 7. Po přijetí do directory
 

@@ -14,7 +14,7 @@ Veřejná app:
 
 ```bash
 npm install
-cp .env.example .env
+cp .env.production.example .env
 npm run dev
 ```
 
@@ -65,6 +65,16 @@ npm run build
 - [openai-chatgpt-app-requirements](./docs/openai-chatgpt-app-requirements.md)
 - [security-compliance-gdpr](./docs/security-compliance-gdpr.md)
 - [home-server-cloudflare-deploy](./docs/home-server-cloudflare-deploy.md)
+- [production-launch-checklist](./docs/production-launch-checklist.md)
+- [chatgpt-web-test-plan](./docs/chatgpt-web-test-plan.md)
 - [chatgpt-publish-step-by-step](./docs/chatgpt-publish-step-by-step.md)
 - [app-directory-submission-pack](./docs/app-directory-submission-pack.md)
 - [costs-and-hosting-options](./docs/costs-and-hosting-options.md)
+
+## Submission assets
+
+- [production env template](./.env.production.example)
+- [App Directory listing copy](./submission/app-directory-listing.md)
+- [reviewer guide](./submission/reviewer-guide.md)
+- [fill before submit](./submission/fill-before-submit.md)
+- [production verification script](./scripts/verify-production.sh)

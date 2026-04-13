@@ -3,10 +3,16 @@
 ## Připravené podklady v tomto workspace
 
 - `submission/chatgpt-app-metadata.json`
+- `submission/app-directory-listing.md`
+- `submission/reviewer-guide.md`
+- `submission/fill-before-submit.md`
 - `assets/chatgpt-app-icon.svg`
 - `docs/chatgpt-publish-step-by-step.md`
 - `docs/security-compliance-gdpr.md`
 - `docs/openai-chatgpt-app-requirements.md`
+- `docs/production-launch-checklist.md`
+- `docs/chatgpt-web-test-plan.md`
+- `scripts/verify-production.sh`
 
 ## Co vyplnit před submission
 
