@@ -1,0 +1,16 @@
+[Unit]
+Description=ABRA Flexi ChatGPT App
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/flexi-chatgpt-app
+EnvironmentFile=/opt/flexi-chatgpt-app/.env
+ExecStart=/usr/bin/npm start
+Restart=always
+RestartSec=5
+User=flexiapp
+Group=flexiapp
+
+[Install]
+WantedBy=multi-user.target

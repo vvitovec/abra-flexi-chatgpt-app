@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title>ABRA Flexi ChatGPT App</title>
+  <defs>
+    <linearGradient id="bg" x1="0%" x2="100%" y1="0%" y2="100%">
+      <stop offset="0%" stop-color="#0d6b57"/>
+      <stop offset="100%" stop-color="#c27a1d"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="56" fill="#f7f3eb"/>
+  <rect x="18" y="18" width="220" height="220" rx="46" fill="url(#bg)"/>
+  <path d="M64 84h128v20H64zM64 118h90v20H64zM64 152h128v20H64z" fill="#fdf7eb"/>
+  <circle cx="180" cy="128" r="26" fill="#fdf7eb"/>
+  <path d="M180 110l8 14 16 2-11 11 3 16-16-8-15 8 3-16-11-11 15-2z" fill="#0d6b57"/>

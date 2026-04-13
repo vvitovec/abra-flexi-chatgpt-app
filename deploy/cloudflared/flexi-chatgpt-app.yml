@@ -1,0 +1,7 @@
+tunnel: flexi-chatgpt-app
+credentials-file: /etc/cloudflared/flexi-chatgpt-app.json
+
+ingress:
+  - hostname: flexi.example.com
+    service: http://127.0.0.1:8787
+  - service: http_status:404

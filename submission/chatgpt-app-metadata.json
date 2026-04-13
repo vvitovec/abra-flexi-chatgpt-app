@@ -1,0 +1,13 @@
+{
+  "name": "ABRA Flexi ChatGPT App",
+  "short_description": "Secure ABRA Flexi accounting app for ChatGPT with firm workspaces and managed Flexi connections.",
+  "category": "business",
+  "support_email": "support@example.com",
+  "privacy_policy_url": "https://flexi.example.com/legal/privacy",
+  "terms_of_use_url": "https://flexi.example.com/legal/terms",
+  "support_url": "https://flexi.example.com/support",
+  "oauth_instructions_url": "https://flexi.example.com/review/demo",
+  "mcp_url": "https://flexi.example.com/mcp",
+  "oauth_issuer_url": "https://flexi.example.com",
+  "icon_path": "assets/chatgpt-app-icon.svg"
+}
