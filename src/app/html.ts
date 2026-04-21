@@ -95,25 +95,23 @@ export function pageTemplate(title: string, body: string): string {
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap");
 
     :root {
-      --bg: #f2eee7;
-      --bg-strong: #e8e2d7;
-      --surface: rgba(255, 255, 255, 0.64);
-      --surface-strong: rgba(255, 255, 255, 0.84);
-      --surface-dark: #121513;
-      --ink: #111417;
-      --muted: #5c635f;
-      --line: rgba(17, 20, 23, 0.12);
-      --line-strong: rgba(17, 20, 23, 0.2);
-      --brand: #0f6a52;
-      --brand-deep: #0a4f3d;
-      --brand-soft: rgba(15, 106, 82, 0.12);
-      --danger: #a33627;
-      --warn: #8d6510;
-      --shadow: 0 24px 72px rgba(17, 20, 23, 0.08);
-      --radius-xl: 32px;
-      --radius-lg: 24px;
-      --radius-md: 18px;
-      --content: 1180px;
+      --bg: #f3f7fc;
+      --bg-strong: #edf3fa;
+      --surface: rgba(255, 255, 255, 0.92);
+      --surface-soft: rgba(248, 251, 255, 0.84);
+      --ink: #182435;
+      --muted: #66768a;
+      --line: rgba(64, 96, 134, 0.14);
+      --line-strong: rgba(64, 96, 134, 0.24);
+      --brand: #5e89bb;
+      --brand-deep: #466f9f;
+      --brand-soft: rgba(94, 137, 187, 0.12);
+      --danger: #b4544b;
+      --warn: #98763d;
+      --radius-xl: 10px;
+      --radius-lg: 8px;
+      --radius-md: 6px;
+      --content: 1120px;
       --font-display: "Manrope", sans-serif;
       --font-body: "Manrope", sans-serif;
       --font-mono: "IBM Plex Mono", monospace;
@@ -133,9 +131,8 @@ export function pageTemplate(title: string, body: string): string {
       color: var(--ink);
       min-height: 100vh;
       background:
-        radial-gradient(circle at 15% 15%, rgba(15, 106, 82, 0.12), transparent 24%),
-        radial-gradient(circle at 85% 20%, rgba(17, 20, 23, 0.08), transparent 20%),
-        linear-gradient(180deg, #f7f4ee 0%, var(--bg) 46%, var(--bg-strong) 100%);
+        radial-gradient(circle at 85% 8%, rgba(94, 137, 187, 0.16), transparent 24%),
+        linear-gradient(180deg, #f8fbff 0%, var(--bg) 48%, var(--bg-strong) 100%);
       position: relative;
       overflow-x: hidden;
     }
@@ -145,111 +142,92 @@ export function pageTemplate(title: string, body: string): string {
       position: fixed;
       inset: 0;
       pointer-events: none;
-      background-image:
-        linear-gradient(rgba(17, 20, 23, 0.035) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(17, 20, 23, 0.035) 1px, transparent 1px);
-      background-size: 72px 72px;
-      mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.26), transparent 78%);
-      opacity: 0.45;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.72), transparent 28%),
+        radial-gradient(circle at 15% 75%, rgba(94, 137, 187, 0.08), transparent 24%);
+      opacity: 0.9;
     }
 
     a {
       color: inherit;
-      text-decoration-color: rgba(17, 20, 23, 0.24);
+      text-decoration-color: rgba(24, 36, 53, 0.18);
       text-underline-offset: 0.18em;
     }
 
     .shell {
       width: min(var(--content), calc(100vw - 40px));
       margin: 0 auto;
-      padding: 28px 0 56px;
+      padding: 28px 0 52px;
       position: relative;
     }
 
     .page {
       display: grid;
-      gap: 26px;
+      gap: 40px;
     }
 
     .hero {
       position: relative;
-      overflow: hidden;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-xl);
-      background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.46)),
-        linear-gradient(180deg, rgba(17, 20, 23, 0.02), rgba(17, 20, 23, 0.05));
-      box-shadow: var(--shadow);
-      padding: 28px;
-      isolation: isolate;
-    }
-
-    .hero::after {
-      content: "";
-      position: absolute;
-      width: 34rem;
-      height: 34rem;
-      right: -9rem;
-      top: -12rem;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(15, 106, 82, 0.26), rgba(15, 106, 82, 0.04) 55%, transparent 72%);
-      animation: drift 18s ease-in-out infinite alternate;
-      z-index: -1;
+      padding: 8px 0 28px;
+      border-bottom: 1px solid var(--line);
     }
 
     .hero-grid,
     .split {
       display: grid;
-      grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.9fr);
-      gap: 24px;
-      align-items: end;
+      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+      gap: 40px;
+      align-items: start;
     }
 
     .auth-layout {
-      min-height: calc(100svh - 84px);
       align-items: stretch;
     }
 
     .auth-story {
       display: grid;
-      align-content: space-between;
+      align-content: start;
       gap: 28px;
-      min-height: 100%;
     }
 
     .auth-forms {
       display: grid;
-      gap: 16px;
+      gap: 18px;
       align-content: start;
     }
 
     .panel,
     .card,
     .hero-panel {
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      background: linear-gradient(180deg, var(--surface-strong), var(--surface));
-      box-shadow: 0 10px 30px rgba(17, 20, 23, 0.05);
-      padding: 22px;
+      border: 0;
+      border-top: 1px solid var(--line);
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      padding: 18px 0 0;
       position: relative;
     }
 
-    .hero-panel {
-      background: linear-gradient(180deg, rgba(18, 21, 19, 0.94), rgba(18, 21, 19, 0.86));
-      color: #f4f0e8;
-      border-color: rgba(255, 255, 255, 0.08);
-      min-height: 100%;
+    .form-panel,
+    .soft-panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface-soft);
+      padding: 20px;
     }
 
-    .hero-panel .muted,
-    .hero-panel .row-meta,
-    .hero-panel p {
-      color: rgba(244, 240, 232, 0.72);
+    .hero-panel {
+      min-height: 100%;
     }
 
     .section,
     .content-section {
-      border-top: 1px solid rgba(17, 20, 23, 0.08);
+      padding-top: 0;
+    }
+
+    .section {
+      margin-top: 24px;
+      border-top: 1px solid var(--line);
       padding-top: 18px;
     }
 
@@ -258,7 +236,7 @@ export function pageTemplate(title: string, body: string): string {
     .doc-grid,
     .workflow-grid {
       display: grid;
-      gap: 18px;
+      gap: 36px;
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -274,9 +252,9 @@ export function pageTemplate(title: string, body: string): string {
       display: flex;
       gap: 14px;
       justify-content: space-between;
-      align-items: end;
+      align-items: start;
       flex-wrap: wrap;
-      margin-bottom: 16px;
+      margin-bottom: 18px;
     }
 
     .section-head p,
@@ -288,22 +266,21 @@ export function pageTemplate(title: string, body: string): string {
     .brand-lockup {
       display: inline-flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
     }
 
     .brand-mark {
-      width: 42px;
-      height: 42px;
+      width: 40px;
+      height: 40px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      border-radius: 14px;
-      background: linear-gradient(135deg, var(--brand), #163c31);
-      color: #f8f4ec;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+      color: #f8fbff;
       font-size: 0.84rem;
       font-weight: 800;
       letter-spacing: 0.08em;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24);
     }
 
     .brand-copy {
@@ -312,7 +289,7 @@ export function pageTemplate(title: string, body: string): string {
     }
 
     .brand-copy strong {
-      font-size: 1rem;
+      font-size: 1.05rem;
       letter-spacing: -0.04em;
     }
 
@@ -320,20 +297,20 @@ export function pageTemplate(title: string, body: string): string {
     .eyebrow {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      color: var(--brand);
+      gap: 6px;
+      color: var(--brand-deep);
       font-size: 0.76rem;
-      font-weight: 800;
-      letter-spacing: 0.12em;
+      font-weight: 700;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
     }
 
     .badge {
       width: fit-content;
-      padding: 0.55rem 0.8rem;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.78);
-      border: 1px solid rgba(15, 106, 82, 0.14);
+      padding: 0.42rem 0.62rem;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid var(--line);
     }
 
     h1,
@@ -341,66 +318,66 @@ export function pageTemplate(title: string, body: string): string {
     h3 {
       margin: 0;
       font-family: var(--font-display);
-      letter-spacing: -0.055em;
-      line-height: 0.95;
+      letter-spacing: -0.06em;
+      line-height: 0.94;
       font-weight: 800;
     }
 
     h1 {
-      font-size: clamp(3rem, 9vw, 5.4rem);
-      max-width: 10ch;
+      font-size: clamp(2rem, 5.4vw, 3.55rem);
+      max-width: 8.2ch;
     }
 
     h2 {
-      font-size: clamp(1.45rem, 3vw, 2.1rem);
+      font-size: clamp(1.4rem, 3vw, 2rem);
     }
 
     h3 {
       font-size: 1rem;
-      letter-spacing: -0.03em;
+      letter-spacing: -0.02em;
     }
 
     p {
       margin: 0;
       color: var(--muted);
-      line-height: 1.7;
-      font-size: 0.98rem;
+      line-height: 1.66;
+      font-size: 0.97rem;
     }
 
     .lede {
       max-width: 54ch;
-      font-size: 1.05rem;
+      font-size: 0.99rem;
     }
 
     .hero-copy {
       display: grid;
-      align-content: end;
-      gap: 18px;
-      padding-top: 14px;
-      min-height: 29rem;
+      align-content: start;
+      gap: 20px;
+      min-height: auto;
     }
 
     .hero-copy .actions {
-      padding-top: 6px;
+      padding-top: 2px;
     }
 
     .metric-strip {
       display: grid;
-      gap: 12px;
+      gap: 14px;
       grid-template-columns: repeat(3, minmax(0, 1fr));
+      padding-top: 4px;
     }
 
     .metric {
       display: grid;
       gap: 6px;
-      padding-top: 12px;
-      border-top: 1px solid rgba(244, 240, 232, 0.12);
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
     }
 
     .metric-label {
-      color: rgba(244, 240, 232, 0.56);
-      font-size: 0.78rem;
-      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-size: 0.74rem;
+      letter-spacing: 0.14em;
       text-transform: uppercase;
     }
 
@@ -411,7 +388,7 @@ export function pageTemplate(title: string, body: string): string {
 
     .actions {
       display: flex;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
       align-items: center;
     }
@@ -420,10 +397,10 @@ export function pageTemplate(title: string, body: string): string {
     button {
       appearance: none;
       border: 1px solid transparent;
-      border-radius: 999px;
-      background: linear-gradient(135deg, var(--brand), var(--brand-deep));
-      color: #f6f2ea;
-      padding: 12px 18px;
+      border-radius: var(--radius-lg);
+      background: var(--brand);
+      color: #f8fbff;
+      padding: 11px 16px;
       font: inherit;
       font-weight: 700;
       cursor: pointer;
@@ -432,26 +409,24 @@ export function pageTemplate(title: string, body: string): string {
       justify-content: center;
       gap: 8px;
       text-decoration: none;
-      transition: transform 180ms ease, box-shadow 180ms ease, background-color 180ms ease, border-color 180ms ease;
-      box-shadow: 0 10px 28px rgba(15, 106, 82, 0.18);
+      transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease, color 180ms ease;
     }
 
     .button:hover,
     button:hover {
       transform: translateY(-1px);
-      box-shadow: 0 16px 36px rgba(15, 106, 82, 0.2);
+      background: var(--brand-deep);
     }
 
     .button.secondary {
-      background: rgba(255, 255, 255, 0.7);
-      border-color: var(--line);
+      background: transparent;
+      border-color: var(--line-strong);
       color: var(--ink);
-      box-shadow: none;
     }
 
     .button.secondary:hover {
-      background: rgba(255, 255, 255, 0.92);
-      border-color: var(--line-strong);
+      background: rgba(255, 255, 255, 0.8);
+      border-color: var(--brand);
     }
 
     label {
@@ -459,7 +434,7 @@ export function pageTemplate(title: string, body: string): string {
       gap: 8px;
       font-size: 0.86rem;
       font-weight: 700;
-      letter-spacing: 0.01em;
+      letter-spacing: 0.005em;
       color: var(--ink);
     }
 
@@ -467,10 +442,10 @@ export function pageTemplate(title: string, body: string): string {
     select,
     textarea {
       width: 100%;
-      border: 1px solid rgba(17, 20, 23, 0.14);
-      border-radius: 18px;
-      background: rgba(255, 255, 255, 0.82);
-      padding: 13px 15px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: rgba(255, 255, 255, 0.9);
+      padding: 12px 14px;
       font: inherit;
       color: var(--ink);
       transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
@@ -480,8 +455,8 @@ export function pageTemplate(title: string, body: string): string {
     select:focus,
     textarea:focus {
       outline: none;
-      border-color: rgba(15, 106, 82, 0.56);
-      box-shadow: 0 0 0 4px rgba(15, 106, 82, 0.12);
+      border-color: rgba(94, 137, 187, 0.5);
+      box-shadow: 0 0 0 3px rgba(94, 137, 187, 0.12);
       background: #fff;
     }
 
@@ -496,14 +471,15 @@ export function pageTemplate(title: string, body: string): string {
       margin: 0;
       padding: 0;
       display: grid;
-      gap: 12px;
+      gap: 0;
     }
 
     .row,
     .list li {
-      border-top: 1px solid rgba(17, 20, 23, 0.08);
+      border-top: 1px solid var(--line);
       padding-top: 12px;
-      transition: transform 180ms ease, border-color 180ms ease;
+      padding-bottom: 12px;
+      transition: border-color 180ms ease, color 180ms ease;
     }
 
     .row:first-child,
@@ -514,8 +490,7 @@ export function pageTemplate(title: string, body: string): string {
 
     .row:hover,
     .list li:hover {
-      transform: translateX(3px);
-      border-color: rgba(15, 106, 82, 0.24);
+      border-color: var(--brand);
     }
 
     .row-copy {
@@ -540,16 +515,16 @@ export function pageTemplate(title: string, body: string): string {
 
     .notice,
     .tip {
-      padding: 14px 16px;
-      border-radius: 18px;
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
       border: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.78);
       color: var(--ink);
     }
 
     .notice {
-      border-color: rgba(15, 106, 82, 0.18);
-      background: rgba(15, 106, 82, 0.08);
+      border-color: rgba(94, 137, 187, 0.18);
+      background: rgba(94, 137, 187, 0.08);
     }
 
     .tip {
@@ -572,10 +547,10 @@ export function pageTemplate(title: string, body: string): string {
     }
 
     .example {
-      border-radius: 18px;
-      padding: 14px 15px;
-      border: 1px solid rgba(17, 20, 23, 0.08);
-      background: rgba(255, 255, 255, 0.68);
+      border-radius: var(--radius-md);
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      background: rgba(248, 251, 255, 0.88);
       color: var(--ink);
       font-family: var(--font-mono);
       font-size: 0.9rem;
@@ -618,32 +593,13 @@ export function pageTemplate(title: string, body: string): string {
       gap: 12px;
       flex-wrap: wrap;
       padding-top: 20px;
-      border-top: 1px solid rgba(17, 20, 23, 0.08);
+      border-top: 1px solid var(--line);
       color: var(--muted);
-      font-size: 0.9rem;
+      font-size: 0.88rem;
     }
 
     [data-reveal] {
-      transition: transform 620ms cubic-bezier(0.2, 0.7, 0, 1), opacity 620ms ease;
-    }
-
-    .js [data-reveal] {
-      opacity: 0;
-      transform: translateY(24px);
-    }
-
-    .js [data-reveal].is-visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    @keyframes drift {
-      from {
-        transform: translate3d(0, 0, 0) scale(1);
-      }
-      to {
-        transform: translate3d(-32px, 28px, 0) scale(1.08);
-      }
+      transition: none;
     }
 
     @media (max-width: 960px) {
@@ -675,12 +631,11 @@ export function pageTemplate(title: string, body: string): string {
       .panel,
       .card,
       .hero-panel {
-        border-radius: 24px;
-        padding: 20px;
+        padding-top: 16px;
       }
 
       h1 {
-        font-size: clamp(2.3rem, 14vw, 3.4rem);
+        font-size: clamp(1.7rem, 10vw, 2.6rem);
       }
 
       .actions {
@@ -768,7 +723,7 @@ export function homePage(viewer: AppViewerContext, connections: FlexiConnection[
             ${brandLockup("ChatGPT App")}
             <div class="stack" data-reveal>
               <span class="badge">Účetní workflow</span>
-              <h1>ABRA Flexi v ChatGPT pro rychlou práci účetního týmu.</h1>
+              <h1>ABRA Flexi v ChatGPT pro účetní tým.</h1>
               <p class="lede">Minimal interface pro přihlášení, správu workspace a bezpečné Flexi onboarding flow. Přístupové údaje se drží v aplikaci, ne v promptu.</p>
             </div>
             ${actionLinks([
@@ -833,7 +788,7 @@ export function loginPage(error?: string, next?: string): string {
               ${brandLockup("Secure access")}
               <div class="stack" data-reveal>
                 <span class="badge">Přihlášení</span>
-                <h1>Jeden přístupový bod pro tým, workspace a Flexi onboarding.</h1>
+                <h1>Týmový přístup a bezpečný Flexi onboarding.</h1>
                 <p class="lede">ChatGPT pracuje jen nad autorizovaným workspace. Flexi přístup zadáváte až po přihlášení ve spravovaném formuláři.</p>
               </div>
             </div>
