@@ -2,6 +2,8 @@ export type FlexiFormat = "json" | "xml";
 export type ProfileMode = "test" | "prod";
 export type WritePolicy = "disabled" | "confirm";
 export type EvidencePermissionScope = "read" | "dryRun" | "write";
+export type FlexiQueryScalar = string | number | boolean;
+export type FlexiQueryValue = FlexiQueryScalar | FlexiQueryScalar[];
 
 export interface FlexiEvidencePermissions {
   read?: string[];
@@ -38,10 +40,21 @@ export interface FlexiRequestOptions {
   profile: ResolvedProfile;
   method: "GET" | "POST" | "PUT";
   path: string;
-  query?: Record<string, string | number | boolean | undefined>;
+  query?: Record<string, FlexiQueryValue | undefined>;
   format: FlexiFormat;
   body?: string;
   contentType?: string;
+}
+
+export interface FlexiBinaryResponse {
+  ok: boolean;
+  http_status: number;
+  headers: Record<string, string>;
+  buffer: Buffer;
+  content_type: string | null;
+  content_length: number;
+  request_id: string;
+  raw_response_path: string;
 }
 
 export interface NormalizedFlexiResponse {
@@ -69,7 +82,7 @@ export interface AuditEntry {
   method: "GET" | "POST" | "PUT";
   path: string;
   format: FlexiFormat;
-  query: Record<string, string | number | boolean | undefined>;
+  query: Record<string, FlexiQueryValue | undefined>;
   request_headers: Record<string, string>;
   request_body?: string;
   response_status?: number;

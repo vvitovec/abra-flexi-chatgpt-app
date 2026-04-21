@@ -5,7 +5,7 @@ import cors from "cors";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
-import { pageTemplate, homePage, loginPage, organizationSettingsPage, connectionFormPage, legalPage, reviewPage, supportPage } from "./html.js";
+import { pageTemplate, homePage, loginPage, organizationSettingsPage, connectionFormPage, legalPage, reviewPage, supportPage, docsPage } from "./html.js";
 import { loadAppConfig, type AppConfig } from "./config.js";
 import { AppDatabase } from "./db.js";
 import { createPublicFlexiMcpServer } from "./flexi-mcp-server.js";
@@ -14,13 +14,16 @@ import { clearSessionCookie, loadSessionState, setSessionCookie } from "./sessio
 import { FlexiAppOAuthProvider } from "./oauth.js";
 import { FlexiClient } from "../client.js";
 import { AuditStore } from "../audit.js";
-import type { ResolvedProfile } from "../types.js";
+import { normalizeFlexiResponse } from "../flexi-response.js";
+import { mapCompaniesToSummary } from "../flexi-dto.js";
+import type { FlexiFormat, ResolvedProfile } from "../types.js";
+import { decryptJson } from "./crypto.js";
 import { defaultEvidencePermissions } from "./default-permissions.js";
 
 function createTemporaryProfile(input: {
   alias: string;
   baseUrl: string;
-  companySlug: string;
+  companySlug?: string;
   defaultFormat: "json" | "xml";
   username: string;
   password: string;
@@ -28,7 +31,7 @@ function createTemporaryProfile(input: {
   return {
     name: input.alias,
     baseUrl: input.baseUrl,
-    company: input.companySlug,
+    company: input.companySlug?.trim() ?? "",
     mode: "prod",
     writes: "confirm",
     defaultFormat: input.defaultFormat,
@@ -54,6 +57,31 @@ function paramValue(value: string | string[] | undefined): string {
   return value?.[0] ?? "";
 }
 
+function formatBinaryFailure(buffer: Buffer, contentType: string | null): string {
+  const text = buffer.toString("utf8");
+  if (contentType?.includes("text/plain")) {
+    const trimmedText = text.trim();
+    if (trimmedText) {
+      return trimmedText;
+    }
+  }
+  const trimmed = text.trimStart();
+  const format: FlexiFormat = contentType?.includes("xml") || trimmed.startsWith("<") ? "xml" : "json";
+  const normalized = normalizeFlexiResponse(format, 400, text, { "content-type": contentType ?? "unknown" });
+  const issues = [...normalized.errors, ...normalized.warnings, ...normalized.messages].filter(Boolean);
+  return issues[0] ?? "Flexi report export failed.";
+}
+
+function resolveReportDownloadTarget(reportKey: string): { evidence: string; auditAction: string } {
+  if (reportKey === "export_assets_liabilities_pdf") {
+    return { evidence: "rozvaha-po-uctech", auditAction: "download_assets_liabilities_pdf" };
+  }
+  if (reportKey === "export_balance_sheet_pdf") {
+    return { evidence: "sestava", auditAction: "download_balance_sheet_pdf" };
+  }
+  return { evidence: "rozvaha-po-uctech", auditAction: "download_report_pdf" };
+}
+
 export function createHttpApp(config = loadAppConfig()) {
   const db = new AppDatabase(config);
   db.seedReviewer();
@@ -67,6 +95,7 @@ export function createHttpApp(config = loadAppConfig()) {
   });
 
   const app = express();
+  app.set("trust proxy", 1);
   app.use(cors());
   app.use(express.json({ limit: "2mb" }));
   app.use(express.urlencoded({ extended: false }));
@@ -106,6 +135,10 @@ export function createHttpApp(config = loadAppConfig()) {
 
   app.get("/healthz", (_req: Request, res: Response) => {
     res.json({ ok: true, app: config.appName });
+  });
+
+  app.get("/favicon.ico", (_req: Request, res: Response) => {
+    res.status(204).end();
   });
 
   app.get("/oauth/authorize", (req: Request, res: Response) => {
@@ -259,10 +292,11 @@ export function createHttpApp(config = loadAppConfig()) {
       return;
     }
     const { alias, base_url, company_slug, username, password, default_format } = req.body as Record<string, string>;
+    const normalizedCompanySlug = company_slug?.trim() ?? "";
     const tempProfile = createTemporaryProfile({
       alias,
       baseUrl: base_url,
-      companySlug: company_slug,
+      companySlug: normalizedCompanySlug,
       defaultFormat: default_format === "xml" ? "xml" : "json",
       username,
       password
@@ -276,18 +310,30 @@ export function createHttpApp(config = loadAppConfig()) {
         path: flexiClient.buildServerPath(tempProfile.defaultFormat),
         format: tempProfile.defaultFormat
       });
-      const evidenceResponse = await flexiClient.request({
-        operation: "onboarding_check_evidence",
-        profile: tempProfile,
-        company: company_slug,
-        method: "GET",
-        path: flexiClient.buildCompanyPath(tempProfile, company_slug, "evidence-list"),
-        format: tempProfile.defaultFormat
-      });
-      if (!companiesResponse.ok || !evidenceResponse.ok) {
-        const issues = [...companiesResponse.errors, ...evidenceResponse.errors].join("; ") || "Flexi connection test failed.";
+      const evidenceResponse = normalizedCompanySlug
+        ? await flexiClient.request({
+            operation: "onboarding_check_evidence",
+            profile: tempProfile,
+            company: normalizedCompanySlug,
+            method: "GET",
+            path: flexiClient.buildCompanyPath(tempProfile, normalizedCompanySlug, "evidence-list"),
+            format: tempProfile.defaultFormat
+          })
+        : null;
+      if (!companiesResponse.ok || (normalizedCompanySlug && !evidenceResponse?.ok)) {
+        const issues = [
+          ...companiesResponse.errors,
+          ...(evidenceResponse?.errors ?? [])
+        ].join("; ") || "Flexi connection test failed.";
         res.type("html").status(400).send(connectionFormPage(undefined, issues));
         return;
+      }
+      if (!normalizedCompanySlug) {
+        const companyCount = companiesResponse.ok ? mapCompaniesToSummary(companiesResponse.data).length : 0;
+        if (companyCount === 0) {
+          res.type("html").status(400).send(connectionFormPage(undefined, "REST API účet nevrátil žádnou dostupnou firmu."));
+          return;
+        }
       }
 
       const encrypted = encryptJson(config, { username, password });
@@ -295,14 +341,20 @@ export function createHttpApp(config = loadAppConfig()) {
         organizationId: viewer.session.active_org_id,
         alias,
         baseUrl: base_url,
-        companySlug: company_slug,
+        companySlug: normalizedCompanySlug,
         defaultFormat: default_format === "xml" ? "xml" : "json",
         mode: "prod",
         keyVersion: encrypted.keyVersion,
         encryptedSecret: JSON.stringify(encrypted)
       });
       db.updateConnectionCheck(connection.id, true);
-      redirectWithMessage(res, "/connections/new", `Připojení '${alias}' bylo uloženo a ověřeno.`);
+      redirectWithMessage(
+        res,
+        "/connections/new",
+        normalizedCompanySlug
+          ? `Připojení '${alias}' bylo uloženo a ověřeno.`
+          : `Připojení '${alias}' bylo uloženo. Firmu budete vybírat dynamicky přes company_slug.`
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       res.type("html").status(400).send(connectionFormPage(undefined, message));
@@ -330,8 +382,110 @@ export function createHttpApp(config = loadAppConfig()) {
     res.type("html").send(supportPage());
   });
 
+  app.get("/docs", (_req: Request, res: Response) => {
+    res.type("html").send(docsPage());
+  });
+
   app.get("/review/demo", (_req: Request, res: Response) => {
     res.type("html").send(reviewPage());
+  });
+
+  app.get("/downloads/reports/:token", async (req: Request, res: Response) => {
+    const token = paramValue(req.params.token);
+    const grant = db.getReportDownloadGrant(token);
+    if (!grant) {
+      res.status(404).type("text/plain").send("Report download link is missing or expired.");
+      return;
+    }
+
+    const connection = db.listConnections(grant.organization_id).find((item) => item.id === grant.connection_id);
+    if (!connection) {
+      res.status(404).type("text/plain").send("The Flexi connection for this report is no longer available.");
+      return;
+    }
+
+    const encryptedSecret = db.getConnectionSecret(connection.id);
+    if (!encryptedSecret) {
+      res.status(500).type("text/plain").send("The Flexi connection is missing credentials.");
+      return;
+    }
+    const reportTarget = resolveReportDownloadTarget(grant.report_key);
+
+    try {
+      const secret = decryptJson<{ username: string; password: string }>(config, JSON.parse(encryptedSecret));
+      const profile = createTemporaryProfile({
+        alias: `download:${connection.alias}`,
+        baseUrl: connection.base_url,
+        companySlug: grant.company_slug,
+        defaultFormat: connection.default_format,
+        username: secret.username,
+        password: secret.password
+      });
+      const reportQuery = JSON.parse(grant.query_json) as Record<string, string | number | boolean | Array<string | number | boolean> | undefined>;
+      const binary = await flexiClient.requestBinary({
+        operation: grant.report_key,
+        profile,
+        company: grant.company_slug,
+        evidence: reportTarget.evidence,
+        method: "GET",
+        path: grant.report_path,
+        query: reportQuery
+      });
+
+      let servedOk = binary.ok;
+      const servedFilename = grant.filename;
+      let servedStatus = binary.http_status;
+      let servedBuffer = binary.buffer;
+      let servedContentType = binary.content_type ?? "application/pdf";
+      let servedContentLength = binary.content_length;
+      let servedMessage = formatBinaryFailure(binary.buffer, binary.content_type);
+
+      if (!servedOk) {
+        db.logAudit({
+          organization_id: grant.organization_id,
+          user_id: grant.user_id,
+          connection_id: grant.connection_id,
+          client_id: null,
+          action: reportTarget.auditAction,
+          status: "error",
+          details_json: JSON.stringify({ token, message: servedMessage, content_type: servedContentType, status: servedStatus })
+        });
+        res.status(servedStatus >= 400 ? servedStatus : 502).type("text/plain").send(servedMessage);
+        return;
+      }
+
+      db.logAudit({
+        organization_id: grant.organization_id,
+        user_id: grant.user_id,
+        connection_id: grant.connection_id,
+        client_id: null,
+        action: reportTarget.auditAction,
+        status: "ok",
+        details_json: JSON.stringify({
+          token,
+          filename: servedFilename,
+          size_bytes: servedContentLength
+        })
+      });
+
+      res.status(200);
+      res.setHeader("Content-Type", servedContentType);
+      res.setHeader("Content-Disposition", `attachment; filename="${servedFilename.replace(/"/g, "")}"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.send(servedBuffer);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      db.logAudit({
+        organization_id: grant.organization_id,
+        user_id: grant.user_id,
+        connection_id: grant.connection_id,
+        client_id: null,
+        action: reportTarget.auditAction,
+        status: "error",
+        details_json: JSON.stringify({ token, message })
+      });
+      res.status(502).type("text/plain").send(message);
+    }
   });
 
   app.post("/mcp", bearerAuth, async (req: Request, res: Response) => {

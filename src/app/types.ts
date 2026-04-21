@@ -83,6 +83,20 @@ export interface DocumentDraft {
   updated_at: string;
 }
 
+export interface ReportDownloadGrant {
+  token: string;
+  organization_id: string;
+  user_id: string;
+  connection_id: string;
+  report_key: string;
+  company_slug: string;
+  report_path: string;
+  query_json: string;
+  filename: string;
+  expires_at: string;
+  created_at: string;
+}
+
 export interface AuditEventRecord {
   id: string;
   organization_id: string;

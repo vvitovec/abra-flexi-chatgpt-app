@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildCreateDocumentPayload,
+  buildAssetsLiabilitiesPdfRequest,
+  buildBalanceSheetPdfRequest,
   buildDocumentItemsUpdatePayload,
   buildReportSelector,
   buildDocumentSearchFilter,
@@ -120,5 +122,46 @@ describe("accounting helpers", () => {
     expect(getSaldoModules("payables")).toBe("FAP,ZAV");
     expect(buildReportSelector("code:PART-001")).toBe("(firma='code:PART-001')");
     expect(toIsoDate("2026-04-13")).toBe("2026-04-13");
+  });
+
+  it("builds assets and liabilities PDF requests with repeated filter parameters", () => {
+    const request = buildAssetsLiabilitiesPdfRequest("demo", {
+      accounting_period: "2026",
+      account_filter: "2,32",
+      account_ids: ["code:211001", "code:112001"],
+      center_ids: ["code:C"],
+      activity_ids: ["code:1"],
+      currency_codes: ["code:CZK"],
+      group_by_center: true
+    });
+
+    expect(request.path).toBe("/c/demo/rozvaha-po-uctech.pdf");
+    expect(request.report_name).toBe("rozvahaPoUctechObraty");
+    expect(request.query).toMatchObject({
+      "report-name": "rozvahaPoUctechObraty",
+      ucetniObdobi: "2026",
+      filtrUcty: "2,32",
+      ucet: ["code:211001", "code:112001"],
+      stredisko: ["code:C"],
+      cinnost: ["code:1"],
+      mena: ["code:CZK"],
+      groupByStredisko: true
+    });
+    expect(request.filename).toContain("demo");
+  });
+
+  it("builds balance sheet PDF requests without account-level filters", () => {
+    const request = buildBalanceSheetPdfRequest("demo", {
+      accounting_period: "2026"
+    });
+
+    expect(request.path).toBe("/c/demo/sestava.pdf");
+    expect(request.report_name).toBe("rozvaha$$SUM");
+    expect(request.query).toMatchObject({
+      "report-name": "rozvaha$$SUM",
+      ucetniObdobi: "2026"
+    });
+    expect(request.filename).toContain("rozvaha-demo-2026");
+    expect(request.report_variant).toBe("balance_sheet_summary");
   });
 });

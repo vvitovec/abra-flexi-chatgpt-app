@@ -199,6 +199,7 @@ function toFriendlyFieldName(name: string): string {
     datSplat: "due_date",
     datUcto: "accounting_date",
     datZdan: "tax_date",
+    datSazbyDph: "tax_date",
     firma: "partner_name",
     osoba: "person_name",
     mena: "currency",
@@ -792,7 +793,7 @@ export function mapDocumentSearchResults(
       partner_name: pickPath(record, ["nazFirmy", "firma@showAs", "firma"]),
       issue_date: pickPath(record, ["datVyst"]),
       due_date: pickPath(record, ["datSplat"]),
-      tax_date: pickPath(record, ["datZdan"]),
+      tax_date: pickPath(record, ["datZdan", "datSazbyDph"]),
       total_amount: pickPath(record, ["sumCelkem", "sumCelkemMen", "celkem"]),
       remaining_amount: pickPath(record, ["zbyvaUhradit"]),
       currency: pickPath(record, ["mena.kod", "mena", "mena@showAs"]),
@@ -829,7 +830,7 @@ export function mapDocumentSummary(data: unknown, evidence: string, kind: string
     partner_name: pickPath(record, ["nazFirmy", "firma@showAs", "firma"]),
     issue_date: pickPath(record, ["datVyst"]),
     due_date: pickPath(record, ["datSplat"]),
-    tax_date: pickPath(record, ["datZdan"]),
+    tax_date: pickPath(record, ["datZdan", "datSazbyDph"]),
     total_amount: pickPath(record, ["sumCelkem", "sumCelkemMen", "celkem"]),
     remaining_amount: pickPath(record, ["zbyvaUhradit"]),
     currency: pickPath(record, ["mena.kod", "mena@showAs", "mena"]),
@@ -917,7 +918,7 @@ export function mapDocumentDetail(
       project: pickPath(record, ["zakazka@showAs", "zakazka"]),
       activity: pickPath(record, ["cinnost@showAs", "cinnost"]),
       accounting_date: pickPath(record, ["datUcto"]),
-      tax_date: pickPath(record, ["datZdan"])
+      tax_date: pickPath(record, ["datZdan", "datSazbyDph"])
     });
   }
 

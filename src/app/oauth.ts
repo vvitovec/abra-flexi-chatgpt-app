@@ -16,10 +16,12 @@ export class SqliteRegisteredClientStore implements OAuthRegisteredClientsStore 
   }
 
   registerClient(client: Omit<OAuthClientInformationFull, "client_id" | "client_id_issued_at">): OAuthClientInformationFull {
+    const isPublicClient = client.token_endpoint_auth_method === "none";
     const registered: OAuthClientInformationFull = {
       ...client,
       client_id: `client_${randomId(8)}`,
-      client_secret: client.client_secret ?? randomId(16),
+      client_secret: isPublicClient ? undefined : (client.client_secret ?? randomId(16)),
+      client_secret_expires_at: isPublicClient ? undefined : client.client_secret_expires_at,
       client_id_issued_at: Math.floor(Date.now() / 1000)
     };
     this.db.upsertClient(registered);

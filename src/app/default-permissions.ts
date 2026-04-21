@@ -31,6 +31,9 @@ export const defaultEvidencePermissions: FlexiEvidencePermissions = {
     "stredisko",
     "zakazka",
     "cinnost",
+    "prehled-zamestnancu",
+    "pracovni-pomer",
+    "nepritomnost",
     "typ-interniho-dokladu",
     "typ-dokladu",
     "predpis-zauctovani"

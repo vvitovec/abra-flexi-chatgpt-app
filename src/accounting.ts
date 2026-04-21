@@ -23,6 +23,22 @@ export type ReportEvidenceKind =
   | "overdue_report_paid"
   | "saldo_report"
   | "saldo_at_date_report";
+export interface AssetsLiabilitiesPdfInput {
+  report_name?: string;
+  accounting_period?: string;
+  account_filter?: string;
+  account_ids?: string[];
+  center_ids?: string[];
+  activity_ids?: string[];
+  currency_codes?: string[];
+  group_by_center?: boolean;
+  group_by_activity?: boolean;
+}
+
+export interface BalanceSheetPdfInput {
+  report_name?: string;
+  accounting_period?: string;
+}
 
 export interface DocumentItemInput {
   product_id?: string;
@@ -63,6 +79,14 @@ interface QueryPreset {
   fields: string[];
   includes?: string[];
   searchFields: string[];
+}
+
+export interface PdfReportRequest {
+  path: string;
+  query: Record<string, string | number | boolean | Array<string | number | boolean> | undefined>;
+  filename: string;
+  report_name: string;
+  report_variant: "assets_liabilities_accounts" | "balance_sheet_summary";
 }
 
 export interface DocumentKindConfig {
@@ -133,7 +157,7 @@ export const documentKindRegistry: Record<DocumentKind, DocumentKindConfig> = {
         "nazFirmy",
         "datVyst",
         "datSplat",
-        "datZdan",
+        "datSazbyDph",
         "sumCelkem",
         "zbyvaUhradit",
         "stavUhrK",
@@ -148,7 +172,7 @@ export const documentKindRegistry: Record<DocumentKind, DocumentKindConfig> = {
     partnerField: "firma",
     issueDateField: "datVyst",
     dueDateField: "datSplat",
-    taxDateField: "datZdan",
+    taxDateField: "datSazbyDph",
     totalField: "sumCelkem",
     remainingField: "zbyvaUhradit",
     paymentStatusField: "stavUhrK",
@@ -182,7 +206,7 @@ export const documentKindRegistry: Record<DocumentKind, DocumentKindConfig> = {
         "nazFirmy",
         "datVyst",
         "datSplat",
-        "datZdan",
+        "datSazbyDph",
         "sumCelkem",
         "zbyvaUhradit",
         "stavUhrK",
@@ -197,7 +221,7 @@ export const documentKindRegistry: Record<DocumentKind, DocumentKindConfig> = {
     partnerField: "firma",
     issueDateField: "datVyst",
     dueDateField: "datSplat",
-    taxDateField: "datZdan",
+    taxDateField: "datSazbyDph",
     totalField: "sumCelkem",
     remainingField: "zbyvaUhradit",
     paymentStatusField: "stavUhrK",
@@ -916,5 +940,62 @@ export function getProductSearchSpec(): { evidence: string; fields: string[]; se
     evidence: "cenik",
     fields: ["id", "kod", "nazev", "mj1", "cenaZakl", "lastUpdate", "typSzbDphK"],
     searchFields: ["kod", "nazev"]
+  };
+}
+
+export function buildAssetsLiabilitiesPdfRequest(
+  companySlug: string,
+  input: AssetsLiabilitiesPdfInput = {}
+): PdfReportRequest {
+  const reportName = input.report_name?.trim() || "rozvahaPoUctechObraty";
+  const period = input.accounting_period?.trim();
+  const normalizedPeriod = period?.replace(/[^a-zA-Z0-9_-]+/g, "-") || "aktualni-obdobi";
+  const filenameParts = [
+    "soupis-aktiv-a-pasiv",
+    companySlug.trim(),
+    normalizedPeriod
+  ].filter(Boolean);
+
+  return {
+    path: `/c/${companySlug}/rozvaha-po-uctech.pdf`,
+    query: {
+      "report-name": reportName,
+      ucetniObdobi: period,
+      filtrUcty: input.account_filter?.trim() || undefined,
+      ucet: input.account_ids?.filter(Boolean),
+      stredisko: input.center_ids?.filter(Boolean),
+      cinnost: input.activity_ids?.filter(Boolean),
+      mena: input.currency_codes?.filter(Boolean),
+      groupByStredisko: input.group_by_center,
+      groupByCinnost: input.group_by_activity
+    },
+    filename: `${filenameParts.join("-")}.pdf`,
+    report_name: reportName,
+    report_variant: "assets_liabilities_accounts"
+  };
+}
+
+export function buildBalanceSheetPdfRequest(
+  companySlug: string,
+  input: BalanceSheetPdfInput = {}
+): PdfReportRequest {
+  const reportName = input.report_name?.trim() || "rozvaha$$SUM";
+  const period = input.accounting_period?.trim();
+  const normalizedPeriod = period?.replace(/[^a-zA-Z0-9_-]+/g, "-") || "aktualni-obdobi";
+  const filenameParts = [
+    "rozvaha",
+    companySlug.trim(),
+    normalizedPeriod
+  ].filter(Boolean);
+
+  return {
+    path: `/c/${companySlug}/sestava.pdf`,
+    query: {
+      "report-name": reportName,
+      ucetniObdobi: period
+    },
+    filename: `${filenameParts.join("-")}.pdf`,
+    report_name: reportName,
+    report_variant: "balance_sheet_summary"
   };
 }

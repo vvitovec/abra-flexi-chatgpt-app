@@ -10,13 +10,13 @@ Business
 
 ## Short Description
 
-Secure ABRA Flexi accounting workspace for ChatGPT with team access and managed company connections.
+ABRA Flexi workflow app for ChatGPT with secure team workspaces, accounting triage, and official PDF exports.
 
 ## Full Description
 
 ABRA Flexi ChatGPT App lets accounting firms and finance teams connect their own ABRA Flexi cloud environments to ChatGPT without sharing credentials across customers.
 
-Each company works in its own workspace. Users sign in to the app, connect their own Flexi account through the onboarding UI, and then use ChatGPT tools for accounting discovery, partner lookup, document review, overdue items, and controlled write workflows.
+Each company works in its own workspace. Users sign in to the app, connect their own Flexi account through the onboarding UI, and then use ChatGPT for accountant-first workflows such as morning triage, VAT and period-close review, overdue items, payment mismatch checks, draft document preparation, and official PDF exports from ABRA Flexi.
 
 The app is designed for multi-tenant use. Flexi credentials are entered only in the app UI, stored encrypted at rest, and never passed as tool inputs in ChatGPT. Write actions are role-gated and audited.
 
@@ -27,7 +27,8 @@ Version 1 supports cloud ABRA Flexi deployments.
 - team workspaces for accounting firms and finance departments
 - multiple Flexi connections per organization
 - secure encrypted credential storage
-- read tools for evidence, partners, products, documents, balances, and accounting overviews
+- morning accounting triage, period-close review, and payment mismatch workflows
+- official ABRA Flexi PDF export for `soupis aktiv a pasiv`
 - controlled write flows with confirmation and audit logging
 
 ## Intended Users

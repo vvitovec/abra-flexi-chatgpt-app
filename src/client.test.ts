@@ -59,6 +59,13 @@ describe("FlexiClient", () => {
     expect(client.buildEvidencePath(profile, "custom", "adresar", "xml", "code:ABC")).toBe("/c/custom/adresar/code:ABC.xml");
   });
 
+  it("throws a readable error when no company slug is available", () => {
+    const client = new FlexiClient(new AuditStore(mkdtempSync(join(tmpdir(), "flexi-logs-"))));
+    expect(() => client.buildCompanyPath({ ...profile, company: "" }, undefined, "evidence-list")).toThrow(
+      "Missing company slug for this Flexi request."
+    );
+  });
+
   it("performs requests and normalizes successful responses", async () => {
     const client = new FlexiClient(new AuditStore(mkdtempSync(join(tmpdir(), "flexi-logs-"))));
     const response = await client.request({
@@ -127,5 +134,96 @@ describe("FlexiClient", () => {
 
     expect(seenUrl).toContain("dry-run=true");
     expect(seenUrl).toContain("auth=http");
+  });
+
+  it("downloads binary PDF responses and preserves repeated query params", async () => {
+    let seenUrl = "";
+
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+
+    server = createServer((req, res) => {
+      seenUrl = req.url ?? "";
+      res.writeHead(200, { "Content-Type": "application/pdf" });
+      res.end(Buffer.from("%PDF-test"));
+    });
+
+    await new Promise<void>((resolve) => {
+      server.listen(0, () => {
+        port = (server.address() as { port: number }).port;
+        profile = {
+          ...profile,
+          baseUrl: `http://127.0.0.1:${port}`
+        };
+        resolve();
+      });
+    });
+
+    const client = new FlexiClient(new AuditStore(mkdtempSync(join(tmpdir(), "flexi-logs-"))));
+    const response = await client.requestBinary({
+      operation: "export_assets_liabilities_pdf",
+      profile,
+      company: "demo",
+      evidence: "rozvaha-po-uctech",
+      method: "GET",
+      path: "/c/demo/rozvaha-po-uctech.pdf",
+      query: {
+        "report-name": "rozvahaPoUctechObraty",
+        ucet: ["code:211001", "code:112001"]
+      }
+    });
+
+    expect(response.ok).toBe(true);
+    expect(response.content_type).toBe("application/pdf");
+    expect(response.buffer.toString("utf8")).toContain("%PDF");
+    expect(seenUrl).toContain("report-name=rozvahaPoUctechObraty");
+    expect(seenUrl).toContain("ucet=code%3A211001");
+    expect(seenUrl).toContain("ucet=code%3A112001");
+  });
+
+  it("downloads balance sheet PDFs through sestava endpoint", async () => {
+    let seenUrl = "";
+
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => (error ? reject(error) : resolve()));
+    });
+
+    server = createServer((req, res) => {
+      seenUrl = req.url ?? "";
+      res.writeHead(200, { "Content-Type": "application/pdf" });
+      res.end(Buffer.from("%PDF-balance"));
+    });
+
+    await new Promise<void>((resolve) => {
+      server.listen(0, () => {
+        port = (server.address() as { port: number }).port;
+        profile = {
+          ...profile,
+          baseUrl: `http://127.0.0.1:${port}`
+        };
+        resolve();
+      });
+    });
+
+    const client = new FlexiClient(new AuditStore(mkdtempSync(join(tmpdir(), "flexi-logs-"))));
+    const response = await client.requestBinary({
+      operation: "export_balance_sheet_pdf",
+      profile,
+      company: "demo",
+      evidence: "sestava",
+      method: "GET",
+      path: "/c/demo/sestava.pdf",
+      query: {
+        "report-name": "rozvaha$$SUM",
+        ucetniObdobi: "2026"
+      }
+    });
+
+    expect(response.ok).toBe(true);
+    expect(response.content_type).toBe("application/pdf");
+    expect(response.buffer.toString("utf8")).toContain("%PDF");
+    expect(seenUrl).toContain("report-name=rozvaha%24%24SUM");
+    expect(seenUrl).toContain("ucetniObdobi=2026");
   });
 });

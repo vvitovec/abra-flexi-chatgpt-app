@@ -4,6 +4,13 @@ dist
 .flexi-harness
 coverage
 .chatgpt-app-data
+SERVER_CONTEXT.local.md
+.local-bin
+deploy/systemd/*.local.service
+deploy/cloudflared/*.local.yml
+deploy/cloudflared/*.local.env
+.playwright-cli
+output/
 *.db
 *.sqlite
 *.sqlite3

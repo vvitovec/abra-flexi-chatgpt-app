@@ -16,6 +16,7 @@ import type {
   Organization,
   OrganizationMember,
   OrganizationRole,
+  ReportDownloadGrant,
   WriteConfirmation
 } from "./types.js";
 
@@ -27,6 +28,17 @@ function nowIso(): string {
 
 function rowToUser(row: any): AppUser {
   return row as AppUser;
+}
+
+function normalizeOAuthClient(client: OAuthClientInformationFull): OAuthClientInformationFull {
+  if (client.token_endpoint_auth_method !== "none") {
+    return client;
+  }
+
+  const normalized = { ...client };
+  delete normalized.client_secret;
+  delete normalized.client_secret_expires_at;
+  return normalized;
 }
 
 export class AppDatabase {
@@ -176,11 +188,26 @@ export class AppDatabase {
         primary key (kind, connection_id, id)
       );
 
+      create table if not exists report_download_grants (
+        token text primary key,
+        organization_id text not null references organizations(id) on delete cascade,
+        user_id text not null references users(id) on delete cascade,
+        connection_id text not null references flexi_connections(id) on delete cascade,
+        report_key text not null,
+        company_slug text not null,
+        report_path text not null,
+        query_json text not null,
+        filename text not null,
+        expires_at text not null,
+        created_at text not null
+      );
+
       create index if not exists idx_sessions_user on sessions(user_id);
       create index if not exists idx_members_user on organization_members(user_id);
       create index if not exists idx_connections_org on flexi_connections(organization_id);
       create index if not exists idx_tokens_refresh on oauth_tokens(refresh_token);
       create index if not exists idx_audit_org_created on audit_events(organization_id, created_at desc);
+      create index if not exists idx_report_download_grants_expires on report_download_grants(expires_at);
     `);
   }
 
@@ -375,19 +402,20 @@ export class AppDatabase {
     organizationId: string;
     alias: string;
     baseUrl: string;
-    companySlug: string;
+    companySlug?: string;
     defaultFormat: "json" | "xml";
     mode: "prod" | "test";
     keyVersion: string;
     encryptedSecret: string;
   }): FlexiConnection {
     const timestamp = nowIso();
+    const companySlug = input.companySlug?.trim() ?? "";
     const connection: FlexiConnection = {
       id: randomId(),
       organization_id: input.organizationId,
       alias: input.alias,
       base_url: input.baseUrl,
-      company_slug: input.companySlug,
+      company_slug: companySlug,
       default_format: input.defaultFormat,
       mode: input.mode,
       status: "active",
@@ -511,21 +539,22 @@ export class AppDatabase {
   }
 
   upsertClient(client: OAuthClientInformationFull): void {
-    const metadataJson = JSON.stringify(client);
+    const normalized = normalizeOAuthClient(client);
+    const metadataJson = JSON.stringify(normalized);
     this.db.prepare(`
       insert into oauth_clients (client_id, client_secret, metadata_json, created_at)
       values (?, ?, ?, ?)
       on conflict(client_id) do update set
         client_secret = excluded.client_secret,
         metadata_json = excluded.metadata_json
-    `).run(client.client_id, client.client_secret ?? null, metadataJson, nowIso());
+    `).run(normalized.client_id, normalized.client_secret ?? null, metadataJson, nowIso());
   }
 
   getClient(clientId: string): OAuthClientInformationFull | undefined {
     const row = this.db.prepare(
       "select metadata_json from oauth_clients where client_id = ?"
     ).get(clientId) as { metadata_json: string } | undefined;
-    return row ? (JSON.parse(row.metadata_json) as OAuthClientInformationFull) : undefined;
+    return row ? normalizeOAuthClient(JSON.parse(row.metadata_json) as OAuthClientInformationFull) : undefined;
   }
 
   createToken(record: OAuthTokenRecord): OAuthTokenRecord {
@@ -624,6 +653,41 @@ export class AppDatabase {
     this.db.prepare(
       "delete from document_drafts where kind = ? and connection_id = ? and id = ?"
     ).run(kind, connectionId, id);
+  }
+
+  createReportDownloadGrant(record: Omit<ReportDownloadGrant, "created_at">): ReportDownloadGrant {
+    const createdAt = nowIso();
+    this.db.prepare(`
+      insert into report_download_grants
+      (token, organization_id, user_id, connection_id, report_key, company_slug, report_path, query_json, filename, expires_at, created_at)
+      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      record.token,
+      record.organization_id,
+      record.user_id,
+      record.connection_id,
+      record.report_key,
+      record.company_slug,
+      record.report_path,
+      record.query_json,
+      record.filename,
+      record.expires_at,
+      createdAt
+    );
+    return { ...record, created_at: createdAt };
+  }
+
+  getReportDownloadGrant(token: string): ReportDownloadGrant | null {
+    const row = this.db.prepare("select * from report_download_grants where token = ?").get(token);
+    if (!row) {
+      return null;
+    }
+    const record = row as ReportDownloadGrant;
+    if (new Date(record.expires_at).getTime() < Date.now()) {
+      this.db.prepare("delete from report_download_grants where token = ?").run(token);
+      return null;
+    }
+    return record;
   }
 
   logAudit(event: Omit<AuditEventRecord, "id" | "created_at">): void {

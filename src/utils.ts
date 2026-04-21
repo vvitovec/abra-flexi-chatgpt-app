@@ -1,3 +1,4 @@
+import type { FlexiQueryValue } from "./types.js";
 import { createHash, randomUUID } from "node:crypto";
 
 export function buildBasicAuthHeader(username: string, password: string): string {
@@ -5,7 +6,7 @@ export function buildBasicAuthHeader(username: string, password: string): string
 }
 
 export function buildQueryString(
-  query: Record<string, string | number | boolean | undefined> | undefined
+  query: Record<string, FlexiQueryValue | undefined> | undefined
 ): string {
   if (!query) {
     return "";
@@ -16,7 +17,10 @@ export function buildQueryString(
     if (value === undefined) {
       continue;
     }
-    params.set(key, String(value));
+    const values = Array.isArray(value) ? value : [value];
+    for (const item of values) {
+      params.append(key, String(item));
+    }
   }
 
   const text = params.toString();
