@@ -465,6 +465,10 @@ export function pageTemplate(title: string, body: string): string {
       resize: vertical;
     }
 
+    .masked-secret {
+      -webkit-text-security: disc;
+    }
+
     .list,
     .rows {
       list-style: none;
@@ -656,8 +660,7 @@ export function pageTemplate(title: string, body: string): string {
     <footer class="site-footer" data-reveal>
       <span>ABRA Flexi ChatGPT App</span>
       <div class="actions">
-        <a href="/docs">Dokumentace</a>
-        <a href="/support">Support</a>
+        <a href="/docs">Návod</a>
         <a href="/legal/privacy">Privacy</a>
         <a href="/legal/terms">Terms</a>
       </div>
@@ -727,8 +730,7 @@ export function homePage(viewer: AppViewerContext, connections: FlexiConnection[
               <p class="lede">Minimal interface pro přihlášení, správu workspace a bezpečné Flexi onboarding flow. Přístupové údaje se drží v aplikaci, ne v promptu.</p>
             </div>
             ${actionLinks([
-              { href: "/docs", label: "Dokumentace", secondary: true },
-              { href: "/support", label: "Support", secondary: true },
+              { href: "/docs", label: "Návod", secondary: true },
               viewer.user
                 ? { href: `/orgs/${encodeURIComponent(viewer.activeOrganization?.id ?? "")}/settings`, label: "Nastavení workspace", secondary: true }
                 : { href: "/login", label: "Přihlásit" },
@@ -837,11 +839,13 @@ export function loginPage(error?: string, next?: string): string {
               </div>
               <form method="post" action="/register">
                 <input type="hidden" name="next" value="${escapeHtml(next ?? "/")}" />
-                <label>Jméno<input type="text" name="display_name" required autocomplete="name" /></label>
                 <label>E-mail<input type="email" name="email" required autocomplete="email" /></label>
                 <label>Heslo<input type="password" name="password" required minlength="12" autocomplete="new-password" /></label>
                 <label>Název organizace<input type="text" name="organization_name" required autocomplete="organization" /></label>
-                <label>Slug organizace<input type="text" name="organization_slug" required pattern="[a-z0-9-]+" autocomplete="off" /></label>
+                <label>Base URL Flexi<input type="url" name="base_url" required placeholder="https://example.flexibee.eu" /></label>
+                <label>Slug firmy<input type="text" name="company_slug" placeholder="volitelné, lze vybrat až v toolu" /></label>
+                <label>REST API uživatel<input type="text" name="username" required /></label>
+                <label>Heslo API uživatele<input type="hidden" name="flexi_password" /><input type="text" required class="masked-secret" autocomplete="off" spellcheck="false" autocapitalize="none" data-1p-ignore="true" data-lpignore="true" data-form-type="other" oninput="this.previousElementSibling.value = this.value" /></label>
                 <button type="submit">Založit účet</button>
               </form>
             </section>
@@ -1054,46 +1058,39 @@ export function legalPage(title: string, paragraphs: string[]): string {
 }
 
 export function supportPage(): string {
-  return pageTemplate("Support", `
+  return pageTemplate("Návod", `
     <main class="page">
       <section class="hero">
         <div class="hero-grid">
           <div class="hero-copy">
-            ${brandLockup("Support")}
+            ${brandLockup("Návod")}
             <div class="stack" data-reveal>
-              <span class="badge">Review ready</span>
-              <h1>Podpora, reviewer účet a provozní kontakt.</h1>
-              <p class="lede">Deployment balíček obsahuje reviewer demo účet, sample organizaci a samostatný walkthrough pro App Directory review.</p>
+              <span class="badge">Přesunuto</span>
+              <h1>Podpora je nově součástí Návodu.</h1>
+              <p class="lede">Všechny informace o supportu, reviewer účtu a provozním kontaktu najdete přímo na stránce Návod.</p>
             </div>
           </div>
           <aside class="hero-panel" data-reveal>
             <div class="detail-rail">
-              <div class="eyebrow">Support channel</div>
-              <h2>Primární kontakt</h2>
-              <p>E-mail uvedený v <span class="mono">SUPPORT_EMAIL</span> slouží jako hlavní podpora pro review i běžný provoz.</p>
+              <div class="eyebrow">Pokračovat</div>
+              <h2>Otevřít Návod</h2>
+              <p>Přejděte na jednotnou stránku s workflow i support informacemi.</p>
+              <div class="actions"><a class="button" href="/docs">Návod</a></div>
             </div>
           </aside>
         </div>
-      </section>
-      <section class="content-section" data-reveal>
-        <section class="panel">
-          <div class="section-stack">
-            <p>Pro App Directory submission použijte demo účet bez 2FA a přiložte screenshoty onboarding flow, přidání Flexi connection a MCP test promptů.</p>
-            <p class="notice">Běžné používání, workflow a prompt příklady jsou na stránce <a href="/docs">uživatelské dokumentace</a>.</p>
-          </div>
-        </section>
       </section>
     </main>
   `);
 }
 
 export function docsPage(): string {
-  return pageTemplate("Dokumentace", `
+  return pageTemplate("Návod", `
     <main class="page">
       <section class="hero">
         <div class="hero-grid">
           <div class="hero-copy">
-            ${brandLockup("Dokumentace")}
+            ${brandLockup("Návod")}
             <div class="stack" data-reveal>
               <span class="badge">Jak pracovat</span>
               <h1>Praktický průvodce pro účetní tým v ChatGPT.</h1>
@@ -1101,7 +1098,6 @@ export function docsPage(): string {
             </div>
             ${actionLinks([
               { href: "/", label: "Dashboard", secondary: true },
-              { href: "/support", label: "Support", secondary: true },
               { href: "/review/demo", label: "Reviewer demo", secondary: true }
             ])}
           </div>
@@ -1157,6 +1153,27 @@ export function docsPage(): string {
               <li>Nespoléhejte na první odpověď u právních nebo daňových rozhodnutí bez lidské kontroly.</li>
             </ul>
             <p class="tip">Do promptu nikdy nevkládejte hesla ani Flexi credentials. Přístup se zadává jen v onboarding formuláři aplikace.</p>
+          </section>
+        </div>
+      </section>
+
+      <section class="content-section" data-reveal>
+        <div class="panel-grid">
+          <section class="panel">
+            <div class="eyebrow">Podpora</div>
+            <h2>Support a reviewer přístup</h2>
+            <p>Primární support je e-mail uvedený v <span class="mono">SUPPORT_EMAIL</span>. Slouží jako hlavní kontakt pro běžný provoz i pro OpenAI review.</p>
+            <p class="section">Pro App Directory submission použijte demo účet bez 2FA a přiložte screenshoty onboarding flow, přidání Flexi connection a MCP test promptů.</p>
+          </section>
+          <section class="panel">
+            <div class="eyebrow">Reviewer</div>
+            <h2>Co má být připravené</h2>
+            <ul class="mini-list">
+              <li>demo účet bez 2FA blokátorů</li>
+              <li>sample organizace s bezpečnými daty</li>
+              <li>alespoň jedno review-ready Flexi připojení</li>
+              <li>jasný walkthrough pro onboarding a test prompty</li>
+            </ul>
           </section>
         </div>
       </section>

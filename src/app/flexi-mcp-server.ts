@@ -1,3 +1,4 @@
+import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -44,6 +45,7 @@ import { AuditStore } from "../audit.js";
 import { TtlCache } from "../cache.js";
 import { FlexiClient } from "../client.js";
 import { normalizeFlexiResponse } from "../flexi-response.js";
+import { buildAssetsLiabilitiesPdfFromRecords } from "../report-pdf.js";
 import {
   aggregateDocumentOverview,
   type CompanySummary,
@@ -77,7 +79,8 @@ import type { AppAuthInfo, ConnectionContext, OrganizationRole, WriteConfirmatio
 
 const connectionArgsSchema = {
   connection_alias: z.string().trim().min(1).optional(),
-  company_slug: z.string().trim().min(1).optional()
+  company_slug: z.string().trim().min(1).optional(),
+  company_name: z.string().trim().min(1).max(160).optional()
 };
 
 const evidenceArgsSchema = {
@@ -363,7 +366,7 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       return selectedCompany;
     }
     throw new Error(
-      `Connection '${ctx.connection.alias}' has no default company. First run 'flexi_list_accessible_companies' or 'flexi_check_connection' and retry with company_slug.`
+      `Connection '${ctx.connection.alias}' has no default company. First run 'flexi_list_accessible_companies' or 'flexi_check_connection' and retry with company_slug or company_name.`
     );
   };
 
@@ -371,7 +374,8 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
     sha256Text(`${companySlug}\n${payload}`);
 
   const buildDraftStorageId = (companySlug: string, id: string): string => `${companySlug}::${id}`;
-  const reportDownloadTtlMs = 10 * 60 * 1000;
+const reportDownloadTtlMs = 10 * 60 * 1000;
+const ASSETS_LIABILITIES_REPORT_DETAIL = "custom:ucet,nazevUctu,zustatekMD,zustatekDal";
 
   const getCatalog = async (ctx: ConnectionContext) =>
     catalogCache.getOrSet(`${ctx.auth.extra.organizationId}:${ctx.connection.id}:${ctx.profile.company}:catalog`, async () => {
@@ -750,10 +754,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug }, extra) => {
+    async ({ connection_alias, company_slug, company_name }, extra) => {
       const auth = extra.authInfo as AppAuthInfo;
       const ctx = resolveConnectionContext(auth, connection_alias);
-      const selectedCompany = applyRequestedCompany(ctx, company_slug);
       const companiesResponse = await client.request({
         operation: "check_connection_list_companies",
         profile: ctx.profile,
@@ -761,6 +764,25 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
         path: client.buildServerPath(ctx.profile.defaultFormat),
         format: ctx.profile.defaultFormat
       });
+      const companies = companiesResponse.ok ? mapCompaniesToSummary(companiesResponse.data) : [];
+      const selectedCompany =
+        company_slug || company_name
+          ? resolveCompanyCandidate(companies, company_name?.trim() || company_slug)?.db_name ?? null
+          : applyRequestedCompany(ctx, company_slug);
+      if ((company_slug || company_name) && !selectedCompany) {
+        return createResult(
+          `Could not map '${company_name?.trim() || company_slug}' to one accessible company. First list accessible companies and retry with an exact company_slug or company_name.`,
+          {
+            ok: false,
+            connection_alias: ctx.connection.alias,
+            company_count: companies.length || undefined,
+            accessible_companies: companies.slice(0, 5)
+          }
+        );
+      }
+      if (selectedCompany) {
+        applyRequestedCompany(ctx, selectedCompany);
+      }
       const evidenceResponse = selectedCompany
         ? await client.request({
             operation: "check_connection_list_evidence",
@@ -771,7 +793,6 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
             format: ctx.profile.defaultFormat
           })
         : null;
-      const companies = companiesResponse.ok ? mapCompaniesToSummary(companiesResponse.data) : [];
       const evidence = evidenceResponse?.ok ? extractEvidenceList(evidenceResponse.data) : [];
       const issues = [...companiesResponse.errors, ...(evidenceResponse?.errors ?? [])];
       const ok = companiesResponse.ok && (evidenceResponse?.ok ?? true);
@@ -781,7 +802,7 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
         ok
           ? selectedCompany
             ? `Connection ${ctx.connection.alias} can access ${ctx.connection.company_slug}.`
-            : `Connection ${ctx.connection.alias} authenticated successfully. Select a company with company_slug for company-scoped tools.`
+            : `Connection ${ctx.connection.alias} authenticated successfully. Select a company with company_slug or company_name for company-scoped tools.`
           : issues.join("; "),
         compactRecord({
           ok,
@@ -811,9 +832,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, query, limit, offset }, extra) => {
+    async ({ connection_alias, company_slug, company_name, query, limit, offset }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const catalog = await getCatalog(ctx);
       const normalizedQuery = query?.toLowerCase();
       const filtered = catalog.filter((item) => {
@@ -854,9 +875,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, evidence, field_limit }, extra) => {
+    async ({ connection_alias, company_slug, company_name, evidence, field_limit }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       ensureEvidencePermission(ctx.profile, "read", evidence);
       const properties = await getProperties(ctx, evidence);
       return createResult(`Loaded properties for ${evidence}.`, {
@@ -880,9 +901,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, evidence, limit }, extra) => {
+    async ({ connection_alias, company_slug, company_name, evidence, limit }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       ensureEvidencePermission(ctx.profile, "read", evidence);
       const relations = await getRelations(ctx, evidence);
       return createResult(`Loaded relations for ${evidence}.`, {
@@ -911,9 +932,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, evidence, query, filter, limit, offset }, extra) => {
+    async ({ connection_alias, company_slug, company_name, evidence, query, filter, limit, offset }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       ensureEvidencePermission(ctx.profile, "read", evidence);
       const response = await client.request({
         operation: "search_records",
@@ -961,9 +982,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, evidence, record_id, detail, include_relations, include_collections }, extra) => {
+    async ({ connection_alias, company_slug, company_name, evidence, record_id, detail, include_relations, include_collections }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       ensureEvidencePermission(ctx.profile, "read", evidence);
       const response = await client.request({
         operation: "get_record",
@@ -1010,9 +1031,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, query, role, limit, offset }, extra) => {
+    async ({ connection_alias, company_slug, company_name, query, role, limit, offset }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const specs = getPartnerSearchSpec(role as PartnerRole).filter((spec) =>
         hasEvidencePermission(ctx.profile, "read", spec.evidence)
       );
@@ -1063,9 +1084,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, id }, extra) => {
+    async ({ connection_alias, company_slug, company_name, id }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       for (const evidence of ["adresar", "dodavatel"]) {
         if (!hasEvidencePermission(ctx.profile, "read", evidence)) {
           continue;
@@ -1105,9 +1126,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, query, active_only, limit, offset }, extra) => {
+    async ({ connection_alias, company_slug, company_name, query, active_only, limit, offset }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const spec = getProductSearchSpec();
       ensureEvidencePermission(ctx.profile, "read", spec.evidence);
       const response = await runQuery({
@@ -1141,9 +1162,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, id }, extra) => {
+    async ({ connection_alias, company_slug, company_name, id }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const evidence = getProductSearchSpec().evidence;
       ensureEvidencePermission(ctx.profile, "read", evidence);
       const response = await client.request({
@@ -1184,9 +1205,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, query, active_only, include_contracts, as_of, limit, offset }, extra) => {
+    async ({ connection_alias, company_slug, company_name, query, active_only, include_contracts, as_of, limit, offset }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const resolvedLimit = limit ?? 20;
       const resolvedOffset = offset ?? 0;
       const evidence = "prehled-zamestnancu";
@@ -1238,9 +1259,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, employee_id, personal_number, query, as_of }, extra) => {
+    async ({ connection_alias, company_slug, company_name, employee_id, personal_number, query, as_of }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const evidence = "prehled-zamestnancu";
       ensureEvidencePermission(ctx.profile, "read", evidence);
       const response = await runQuery({
@@ -1296,9 +1317,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, personal_number, query, date_from, date_to, limit }, extra) => {
+    async ({ connection_alias, company_slug, company_name, personal_number, query, date_from, date_to, limit }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const catalog = await getCatalog(ctx);
       const visibleEvidence = Object.keys(EMPLOYEE_DOCUMENT_FIELDS).filter(
         (evidence) => catalog.some((item) => item.path === evidence) && hasEvidencePermission(ctx.profile, "read", evidence)
@@ -1351,7 +1372,6 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
 
   const exportAssetsLiabilitiesPdfInput = z.object({
     ...connectionArgsSchema,
-    company_name: z.string().trim().min(1).max(160).optional(),
     accounting_period: z.string().trim().max(32).optional(),
     year: z.string().trim().regex(/^\d{4}$/).optional(),
     account_filter: z.string().trim().max(128).optional(),
@@ -1366,13 +1386,12 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
 
   const exportBalanceSheetPdfInput = z.object({
     ...connectionArgsSchema,
-    company_name: z.string().trim().min(1).max(160).optional(),
     accounting_period: z.string().trim().max(32).optional(),
     year: z.string().trim().regex(/^\d{4}$/).optional()
   });
   type ExportBalanceSheetPdfArgs = z.infer<typeof exportBalanceSheetPdfInput>;
 
-  const resolveRequestedCompanyForPdf = async (
+  const resolveRequestedCompany = async (
     ctx: ConnectionContext,
     company_slug?: string,
     company_name?: string
@@ -1383,7 +1402,7 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       const companies = await getAccessibleCompanies(ctx);
       const resolvedCompany = resolveCompanyCandidate(companies, requestedCompany);
       if (!resolvedCompany) {
-        throw new Error(`Could not map '${requestedCompany}' to one accessible company. First list accessible companies and retry with an exact company_slug.`);
+        throw new Error(`Could not map '${requestedCompany}' to one accessible company. First list accessible companies and retry with an exact company_slug or company_name.`);
       }
       selectedCompany = resolvedCompany.db_name;
     } else {
@@ -1396,9 +1415,10 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
   const exportAssetsLiabilitiesPdfHandler = async ({ connection_alias, company_slug, company_name, accounting_period, year, account_filter, account_ids, center_ids, activity_ids, currency_codes, group_by_center, group_by_activity }: ExportAssetsLiabilitiesPdfArgs, extra: any) => {
       const auth = extra.authInfo as AppAuthInfo;
       const ctx = resolveConnectionContext(auth, connection_alias);
-      const selectedCompany = await resolveRequestedCompanyForPdf(ctx, company_slug, company_name);
+      const selectedCompany = await resolveRequestedCompany(ctx, company_slug, company_name);
+      const requestedPeriod = accounting_period ?? year;
       const report = buildAssetsLiabilitiesPdfRequest(selectedCompany, {
-        accounting_period: accounting_period ?? year,
+        accounting_period: requestedPeriod,
         account_filter,
         account_ids,
         center_ids,
@@ -1416,6 +1436,11 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
         path: report.path,
         query: report.query
       });
+      let reportKey = "export_assets_liabilities_pdf";
+      let reportPath = report.path;
+      let reportQuery = report.query;
+      let reportFilename = report.filename;
+      let exportOrigin = "native_flexi_pdf";
       if (!probe.ok) {
         const issue = summarizeBinaryIssues(
           probe.http_status,
@@ -1423,23 +1448,75 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
           probe.buffer,
           "Assets and liabilities report export failed."
         );
-        throw new Error(`Official assets and liabilities PDF export failed: ${issue}`);
+        const recordsResponse = await client.request({
+          operation: "export_assets_liabilities_pdf_generate_from_records",
+          profile: ctx.profile,
+          company: selectedCompany,
+          evidence: "rozvaha-po-uctech",
+          method: "GET",
+          path: client.buildEvidencePath(ctx.profile, selectedCompany, "rozvaha-po-uctech", ctx.profile.defaultFormat),
+          format: ctx.profile.defaultFormat,
+          query: compactRecord({
+            ucetniObdobi: requestedPeriod,
+            detail: ASSETS_LIABILITIES_REPORT_DETAIL,
+            limit: 5000,
+            filtrUcty: account_filter?.trim() || undefined,
+            ucet: account_ids?.filter(Boolean),
+            stredisko: center_ids?.filter(Boolean),
+            cinnost: activity_ids?.filter(Boolean),
+            mena: currency_codes?.filter(Boolean),
+            groupByStredisko: group_by_center,
+            groupByCinnost: group_by_activity
+          })
+        });
+        if (!recordsResponse.ok) {
+          const recordsIssue = summarizeIssues(recordsResponse, "Account-level report data lookup failed.");
+          throw new Error(`Official assets and liabilities PDF export failed: ${issue}. Data fallback also failed: ${recordsIssue}`);
+        }
+        const rows = extractRecordList(recordsResponse.data, "rozvaha-po-uctech").map((record) => ({
+          account_code: String(record["ucet@showAs"] ?? record.ucet ?? "").replace(/^code:/, "").split(":")[0]?.trim() ?? "",
+          account_name: String(record.nazevUctu ?? ""),
+          debit_balance: String(record.zustatekMD ?? ""),
+          credit_balance: String(record.zustatekDal ?? "")
+        })).filter((row) => row.account_code || row.account_name);
+        if (rows.length === 0) {
+          throw new Error(`Official assets and liabilities PDF export failed: ${issue}. Data fallback returned no rows.`);
+        }
+        const generatedToken = randomId(24);
+        const generatedDir = resolve(config.appDataDir, "generated-reports");
+        mkdirSync(generatedDir, { recursive: true });
+        const generatedPath = resolve(generatedDir, `${generatedToken}.pdf`);
+        const pdfBuffer = buildAssetsLiabilitiesPdfFromRecords({
+          company_name: company_name || selectedCompany,
+          company_slug: selectedCompany,
+          accounting_period: requestedPeriod,
+          exported_at: new Date().toISOString(),
+          rows
+        });
+        writeFileSync(generatedPath, pdfBuffer);
+        reportKey = "export_assets_liabilities_pdf_generated";
+        reportPath = generatedPath;
+        reportQuery = {};
+        reportFilename = report.filename;
+        exportOrigin = "generated_from_flexi_records";
       }
       const grant = db.createReportDownloadGrant({
         token: randomId(24),
         organization_id: auth.extra.organizationId,
         user_id: auth.extra.userId,
         connection_id: ctx.connection.id,
-        report_key: "export_assets_liabilities_pdf",
+        report_key: reportKey,
         company_slug: selectedCompany,
-        report_path: report.path,
-        query_json: JSON.stringify(report.query),
-        filename: report.filename,
+        report_path: reportPath,
+        query_json: JSON.stringify(reportQuery),
+        filename: reportFilename,
         expires_at: new Date(Date.now() + reportDownloadTtlMs).toISOString()
       });
       const downloadUrl = new URL(`/downloads/reports/${grant.token}`, config.appBaseUrl).toString();
       return createResult(
-        `Official ABRA Flexi PDF report is ready.\nDownload URL: ${downloadUrl}`,
+        exportOrigin === "native_flexi_pdf"
+          ? `Official ABRA Flexi PDF report is ready.\nDownload URL: ${downloadUrl}`
+          : `Soupis aktiv a pasiv PDF was generated from ABRA Flexi report data.\nDownload URL: ${downloadUrl}`,
         {
         ok: true,
         report_variant: report.report_variant,
@@ -1449,11 +1526,11 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
         filename: report.filename,
         mime_type: "application/pdf",
         source_system: "ABRA Flexi",
-        export_origin: "native_flexi_pdf",
+        export_origin: exportOrigin,
         download_url: downloadUrl,
         download_expires_at: grant.expires_at,
         filters: compactRecord({
-          accounting_period: accounting_period ?? year,
+          accounting_period: requestedPeriod,
           year,
           account_filter,
           account_ids,
@@ -1469,7 +1546,7 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
   const exportBalanceSheetPdfHandler = async ({ connection_alias, company_slug, company_name, accounting_period, year }: ExportBalanceSheetPdfArgs, extra: any) => {
       const auth = extra.authInfo as AppAuthInfo;
       const ctx = resolveConnectionContext(auth, connection_alias);
-      const selectedCompany = await resolveRequestedCompanyForPdf(ctx, company_slug, company_name);
+      const selectedCompany = await resolveRequestedCompany(ctx, company_slug, company_name);
       const report = buildBalanceSheetPdfRequest(selectedCompany, {
         accounting_period: accounting_period ?? year
       });
@@ -1527,7 +1604,7 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
     "export_assets_liabilities_pdf",
     {
       title: "Export official soupis aktiv a pasiv PDF",
-      description: "Use only when the user wants the official ABRA Flexi 'soupis aktiv a pasiv' PDF export. This returns the native account-level PDF from Flexi and must not be used for summaries, explanations, or simplified Rozvaha output.",
+      description: "Use only when the user wants the ABRA Flexi 'soupis aktiv a pasiv' PDF export. Prefer the native account-level PDF from Flexi and, if that API export is unavailable, generate the same soupis from Flexi account-level report data. Never fall back to Rozvaha.",
       inputSchema: exportAssetsLiabilitiesPdfInput,
       annotations: annotationsFor("read"),
       _meta: readMeta
@@ -1560,9 +1637,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, date_from, date_to }, extra) => {
+    async ({ connection_alias, company_slug, company_name, date_from, date_to }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const periodEnd = toIsoDate(date_to);
       const periodStart = date_from ?? `${periodEnd.slice(0, 7)}-01`;
       const [outgoingResponse, incomingResponse] = await Promise.all([
@@ -1620,9 +1697,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, period_start, period_end }, extra) => {
+    async ({ connection_alias, company_slug, company_name, period_start, period_end }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const resolvedEnd = toIsoDate(period_end);
       const resolvedStart = period_start ?? `${resolvedEnd.slice(0, 7)}-01`;
       const [salesResponse, purchaseResponse, bankResponse] = await Promise.all([
@@ -1739,9 +1816,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, date_from, date_to, include_bank, limit }, extra) => {
+    async ({ connection_alias, company_slug, company_name, date_from, date_to, include_bank, limit }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const resolvedEnd = toIsoDate(date_to);
       const requests = [
         runQuery({
@@ -1835,9 +1912,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, as_of }, extra) => {
+    async ({ connection_alias, company_slug, company_name, as_of }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const asOfDate = toIsoDate(as_of);
       const unpaidFilter = "zbyvaUhradit gt 0";
       const [receivablesResponse, payablesResponse] = await Promise.all([
@@ -1891,9 +1968,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, as_of, limit }, extra) => {
+    async ({ connection_alias, company_slug, company_name, as_of, limit }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const asOfDate = toIsoDate(as_of);
       const [receivablesResponse, payablesResponse, salesResponse, purchaseResponse] = await Promise.all([
         runQuery({
@@ -1996,10 +2073,10 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("write"),
       _meta: writeMeta
     },
-    async ({ connection_alias, company_slug, kind, partner_id, partner_query, document_type_id, issue_date, due_date, tax_date, currency, payment_method_id, note, create_draft, items }, extra) => {
+    async ({ connection_alias, company_slug, company_name, kind, partner_id, partner_query, document_type_id, issue_date, due_date, tax_date, currency, payment_method_id, note, create_draft, items }, extra) => {
       const auth = extra.authInfo as AppAuthInfo;
       const ctx = resolveConnectionContext(auth, connection_alias);
-      const selectedCompany = ensureSelectedCompany(ctx, company_slug);
+      const selectedCompany = await resolveRequestedCompany(ctx, company_slug, company_name);
       if (create_draft) {
         ensureWriteRole(auth);
       }
@@ -2173,9 +2250,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, kind, id, as_of }, extra) => {
+    async ({ connection_alias, company_slug, company_name, kind, id, as_of }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const configForKind = getDocumentKindConfig(kind as DocumentKind);
       const response = await client.request({
         operation: `explain_document_issue_${kind}`,
@@ -2232,9 +2309,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, kind, query, partner_id, status, date_from, date_to, due_from, due_to, unpaid_only, overdue_only, limit, offset }, extra) => {
+    async ({ connection_alias, company_slug, company_name, kind, query, partner_id, status, date_from, date_to, due_from, due_to, unpaid_only, overdue_only, limit, offset }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const configForKind = getDocumentKindConfig(kind as DocumentKind);
       ensureEvidencePermission(ctx.profile, "read", configForKind.evidence);
       const filter = buildDocumentSearchFilter(configForKind, {
@@ -2282,9 +2359,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, kind, id }, extra) => {
+    async ({ connection_alias, company_slug, company_name, kind, id }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const configForKind = getDocumentKindConfig(kind as DocumentKind);
       const response = await client.request({
         operation: `get_document_summary_${kind}`,
@@ -2324,9 +2401,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, kind, id, include_items, include_payments, include_accounting, include_links }, extra) => {
+    async ({ connection_alias, company_slug, company_name, kind, id, include_items, include_payments, include_accounting, include_links }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const configForKind = getDocumentKindConfig(kind as DocumentKind);
       const response = await client.request({
         operation: `get_document_detail_${kind}`,
@@ -2372,9 +2449,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, kind, partner_id, overdue_only, limit, offset }, extra) => {
+    async ({ connection_alias, company_slug, company_name, kind, partner_id, overdue_only, limit, offset }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const configForKind = getDocumentKindConfig(kind as DocumentKind);
       const filter = buildDocumentSearchFilter(configForKind, {
         partner_id,
@@ -2415,9 +2492,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, scope, partner_id, date, limit, offset }, extra) => {
+    async ({ connection_alias, company_slug, company_name, scope, partner_id, date, limit, offset }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const resolvedDate = toIsoDate(date);
       const primary = await fetchReportRecords({
         ctx,
@@ -2470,9 +2547,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, partner_id, date }, extra) => {
+    async ({ connection_alias, company_slug, company_name, partner_id, date }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const resolvedDate = toIsoDate(date);
       for (const reportKind of ["saldo_at_date_report", "saldo_report"] as const) {
         const primary = await fetchReportRecords({
@@ -2516,9 +2593,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, date, include_overdue }, extra) => {
+    async ({ connection_alias, company_slug, company_name, date, include_overdue }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const snapshotDate = toIsoDate(date);
       if (include_overdue) {
         const primary = await fetchReportRecords({
@@ -2620,9 +2697,9 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("read"),
       _meta: readMeta
     },
-    async ({ connection_alias, company_slug, kind, query, limit, offset }, extra) => {
+    async ({ connection_alias, company_slug, company_name, kind, query, limit, offset }, extra) => {
       const ctx = resolveConnectionContext(extra.authInfo as AppAuthInfo, connection_alias);
-      ensureSelectedCompany(ctx, company_slug);
+      await resolveRequestedCompany(ctx, company_slug, company_name);
       const refConfig = getReferenceValueConfig(kind as ReferenceValueKind);
       ensureEvidencePermission(ctx.profile, "read", refConfig.evidence);
       const cache = getReferenceLookupCache(kind as ReferenceValueKind);
@@ -2677,11 +2754,11 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("write"),
       _meta: writeMeta
     },
-    async ({ connection_alias, company_slug, evidence, payload, payload_format, idempotency_key }, extra) => {
+    async ({ connection_alias, company_slug, company_name, evidence, payload, payload_format, idempotency_key }, extra) => {
       const auth = extra.authInfo as AppAuthInfo;
       ensureWriteRole(auth);
       const ctx = resolveConnectionContext(auth, connection_alias);
-      const selectedCompany = ensureSelectedCompany(ctx, company_slug);
+      const selectedCompany = await resolveRequestedCompany(ctx, company_slug, company_name);
       ensureEvidencePermission(ctx.profile, "dryRun", evidence);
       const bodyFormat = detectPayloadFormat(payload_format, payload);
       const response = await client.request({
@@ -2729,11 +2806,11 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("write"),
       _meta: writeMeta
     },
-    async ({ connection_alias, company_slug, evidence, payload, payload_format, idempotency_key }, extra) => {
+    async ({ connection_alias, company_slug, company_name, evidence, payload, payload_format, idempotency_key }, extra) => {
       const auth = extra.authInfo as AppAuthInfo;
       ensureWriteRole(auth);
       const ctx = resolveConnectionContext(auth, connection_alias);
-      const selectedCompany = ensureSelectedCompany(ctx, company_slug);
+      const selectedCompany = await resolveRequestedCompany(ctx, company_slug, company_name);
       const payloadFormat = detectPayloadFormat(payload_format, payload);
       const confirmation = db.createWriteConfirmation({
         id: randomId(),
@@ -2772,11 +2849,11 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("write"),
       _meta: writeMeta
     },
-    async ({ connection_alias, company_slug, evidence, payload, payload_format, idempotency_key, confirmation_id }, extra) => {
+    async ({ connection_alias, company_slug, company_name, evidence, payload, payload_format, idempotency_key, confirmation_id }, extra) => {
       const auth = extra.authInfo as AppAuthInfo;
       ensureWriteRole(auth);
       const ctx = resolveConnectionContext(auth, connection_alias);
-      const selectedCompany = ensureSelectedCompany(ctx, company_slug);
+      const selectedCompany = await resolveRequestedCompany(ctx, company_slug, company_name);
       const confirmation = db.consumeWriteConfirmation(confirmation_id);
       if (!confirmation) {
         throw new Error("Invalid or expired confirmation_id.");
@@ -2852,11 +2929,11 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("write"),
       _meta: writeMeta
     },
-    async ({ connection_alias, company_slug, ...input }, extra) => {
+    async ({ connection_alias, company_slug, company_name, ...input }, extra) => {
       const auth = extra.authInfo as AppAuthInfo;
       ensureWriteRole(auth);
       const ctx = resolveConnectionContext(auth, connection_alias);
-      const selectedCompany = ensureSelectedCompany(ctx, company_slug);
+      const selectedCompany = await resolveRequestedCompany(ctx, company_slug, company_name);
       const configForKind = getDocumentKindConfig(input.kind as DocumentKind);
       const built = buildCreateDocumentPayload(input as CreateDocumentDraftInput);
       const result = await executeAccountantWrite({
@@ -2908,11 +2985,11 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("write"),
       _meta: writeMeta
     },
-    async ({ connection_alias, company_slug, kind, id, changes }, extra) => {
+    async ({ connection_alias, company_slug, company_name, kind, id, changes }, extra) => {
       const auth = extra.authInfo as AppAuthInfo;
       ensureWriteRole(auth);
       const ctx = resolveConnectionContext(auth, connection_alias);
-      const selectedCompany = ensureSelectedCompany(ctx, company_slug);
+      const selectedCompany = await resolveRequestedCompany(ctx, company_slug, company_name);
       const configForKind = getDocumentKindConfig(kind as DocumentKind);
       const built = buildDocumentHeaderUpdatePayload(kind as DocumentKind, id, changes);
       const result = await executeAccountantWrite({ ctx, kind, evidence: built.evidence, payload: built.payload });
@@ -2965,11 +3042,11 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("write"),
       _meta: writeMeta
     },
-    async ({ connection_alias, company_slug, kind, id, items }, extra) => {
+    async ({ connection_alias, company_slug, company_name, kind, id, items }, extra) => {
       const auth = extra.authInfo as AppAuthInfo;
       ensureWriteRole(auth);
       const ctx = resolveConnectionContext(auth, connection_alias);
-      const selectedCompany = ensureSelectedCompany(ctx, company_slug);
+      const selectedCompany = await resolveRequestedCompany(ctx, company_slug, company_name);
       const configForKind = getDocumentKindConfig(kind as DocumentKind);
       const built = buildDocumentItemsUpdatePayload(kind as DocumentKind, id, items as DocumentItemInput[]);
       const result = await executeAccountantWrite({ ctx, kind, evidence: built.evidence, payload: built.payload });
@@ -3013,11 +3090,11 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("write"),
       _meta: writeMeta
     },
-    async ({ connection_alias, company_slug, kind, id }, extra) => {
+    async ({ connection_alias, company_slug, company_name, kind, id }, extra) => {
       const auth = extra.authInfo as AppAuthInfo;
       ensureWriteRole(auth);
       const ctx = resolveConnectionContext(auth, connection_alias);
-      const selectedCompany = ensureSelectedCompany(ctx, company_slug);
+      const selectedCompany = await resolveRequestedCompany(ctx, company_slug, company_name);
       const storedDraft = db.getDraft(kind, ctx.connection.id, buildDraftStorageId(selectedCompany, id));
       if (!storedDraft) {
         return createResult(`No stored draft snapshot found for ${kind}/${id}.`, { ok: false });
@@ -3057,11 +3134,11 @@ export function createPublicFlexiMcpServer(db: AppDatabase, config: AppConfig): 
       annotations: annotationsFor("write"),
       _meta: writeMeta
     },
-    async ({ connection_alias, company_slug, kind, id }, extra) => {
+    async ({ connection_alias, company_slug, company_name, kind, id }, extra) => {
       const auth = extra.authInfo as AppAuthInfo;
       ensureWriteRole(auth);
       const ctx = resolveConnectionContext(auth, connection_alias);
-      const selectedCompany = ensureSelectedCompany(ctx, company_slug);
+      const selectedCompany = await resolveRequestedCompany(ctx, company_slug, company_name);
       const configForKind = getDocumentKindConfig(kind as DocumentKind);
       const built = buildPostDocumentPayload(kind as DocumentKind, id);
       const result = await executeAccountantWrite({ ctx, kind, evidence: built.evidence, payload: built.payload });

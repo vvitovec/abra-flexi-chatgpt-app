@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import express from "express";
 import type { NextFunction, Request, Response } from "express";
@@ -72,7 +73,13 @@ function formatBinaryFailure(buffer: Buffer, contentType: string | null): string
   return issues[0] ?? "Flexi report export failed.";
 }
 
-function resolveReportDownloadTarget(reportKey: string): { evidence: string; auditAction: string } {
+function resolveReportDownloadTarget(reportKey: string, reportPath?: string): { evidence: string; auditAction: string; local_file?: boolean } {
+  if (reportKey === "export_assets_liabilities_pdf_generated") {
+    return { evidence: "rozvaha-po-uctech", auditAction: "download_assets_liabilities_pdf_generated", local_file: true };
+  }
+  if (reportPath?.includes("/sestava.pdf")) {
+    return { evidence: "sestava", auditAction: "download_balance_sheet_pdf" };
+  }
   if (reportKey === "export_assets_liabilities_pdf") {
     return { evidence: "rozvaha-po-uctech", auditAction: "download_assets_liabilities_pdf" };
   }
@@ -80,6 +87,144 @@ function resolveReportDownloadTarget(reportKey: string): { evidence: string; aud
     return { evidence: "sestava", auditAction: "download_balance_sheet_pdf" };
   }
   return { evidence: "rozvaha-po-uctech", auditAction: "download_report_pdf" };
+}
+
+type ManagedConnectionInput = {
+  alias: string;
+  baseUrl: string;
+  companySlug: string;
+  username: string;
+  password: string;
+  defaultFormat: "json" | "xml";
+};
+
+function normalizeManagedConnectionInput(
+  body: Record<string, string>,
+  fallbackAlias?: string
+): ManagedConnectionInput {
+  return {
+    alias: body.alias?.trim() || fallbackAlias || "default",
+    baseUrl: body.base_url?.trim() ?? "",
+    companySlug: body.company_slug?.trim() ?? "",
+    username: body.username?.trim() ?? "",
+    password: body.password ?? "",
+    defaultFormat: body.default_format === "xml" ? "xml" : "json"
+  };
+}
+
+function defaultDisplayNameFromEmail(email: string): string {
+  return email.trim();
+}
+
+function slugifyOrganizationName(name: string): string {
+  const base = name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return base || "organization";
+}
+
+function createUniqueOrganizationSlug(db: AppDatabase, organizationName: string): string {
+  const baseSlug = slugifyOrganizationName(organizationName);
+  let slug = baseSlug;
+  let suffix = 2;
+
+  while (db.getOrganizationBySlug(slug)) {
+    slug = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+
+  return slug;
+}
+
+async function verifyManagedConnectionInput(flexiClient: FlexiClient, connection: ManagedConnectionInput): Promise<void> {
+  const tempProfile = createTemporaryProfile({
+    alias: connection.alias,
+    baseUrl: connection.baseUrl,
+    companySlug: connection.companySlug,
+    defaultFormat: connection.defaultFormat,
+    username: connection.username,
+    password: connection.password
+  });
+
+  const companiesResponse = await flexiClient.request({
+    operation: "onboarding_check_companies",
+    profile: tempProfile,
+    method: "GET",
+    path: flexiClient.buildServerPath(tempProfile.defaultFormat),
+    format: tempProfile.defaultFormat
+  });
+  const evidenceResponse = connection.companySlug
+    ? await flexiClient.request({
+        operation: "onboarding_check_evidence",
+        profile: tempProfile,
+        company: connection.companySlug,
+        method: "GET",
+        path: flexiClient.buildCompanyPath(tempProfile, connection.companySlug, "evidence-list"),
+        format: tempProfile.defaultFormat
+      })
+    : null;
+
+  if (!companiesResponse.ok || (connection.companySlug && !evidenceResponse?.ok)) {
+    const issues = [
+      ...companiesResponse.errors,
+      ...(evidenceResponse?.errors ?? [])
+    ].join("; ") || "Flexi connection test failed.";
+    throw new Error(issues);
+  }
+
+  if (!connection.companySlug) {
+    const companyCount = companiesResponse.ok ? mapCompaniesToSummary(companiesResponse.data).length : 0;
+    if (companyCount === 0) {
+      throw new Error("REST API účet nevrátil žádnou dostupnou firmu.");
+    }
+  }
+}
+
+function storeManagedConnection(input: {
+  db: AppDatabase;
+  config: AppConfig;
+  organizationId: string;
+  connection: ManagedConnectionInput;
+}): string {
+  const encrypted = encryptJson(input.config, {
+    username: input.connection.username,
+    password: input.connection.password
+  });
+  const connection = input.db.createConnection({
+    organizationId: input.organizationId,
+    alias: input.connection.alias,
+    baseUrl: input.connection.baseUrl,
+    companySlug: input.connection.companySlug,
+    defaultFormat: input.connection.defaultFormat,
+    mode: "prod",
+    keyVersion: encrypted.keyVersion,
+    encryptedSecret: JSON.stringify(encrypted)
+  });
+  input.db.updateConnectionCheck(connection.id, true);
+
+  return input.connection.companySlug
+    ? `Připojení '${input.connection.alias}' bylo uloženo a ověřeno.`
+    : `Připojení '${input.connection.alias}' bylo uloženo. Firmu budete vybírat dynamicky přes company_slug.`;
+}
+
+async function createManagedConnectionFromInput(input: {
+  db: AppDatabase;
+  config: AppConfig;
+  flexiClient: FlexiClient;
+  organizationId: string;
+  connection: ManagedConnectionInput;
+}): Promise<string> {
+  await verifyManagedConnectionInput(input.flexiClient, input.connection);
+  return storeManagedConnection({
+    db: input.db,
+    config: input.config,
+    organizationId: input.organizationId,
+    connection: input.connection
+  });
 }
 
 export function createHttpApp(config = loadAppConfig()) {
@@ -106,16 +251,6 @@ export function createHttpApp(config = loadAppConfig()) {
     res.locals.viewer = state;
     next();
   });
-
-  app.use(mcpAuthRouter({
-    provider,
-    issuerUrl: new URL(config.appBaseUrl),
-    baseUrl: new URL(config.appBaseUrl),
-    resourceServerUrl: new URL(`${config.appBaseUrl}/mcp`),
-    resourceName: "ABRA Flexi ChatGPT App",
-    serviceDocumentationUrl: new URL(`${config.appBaseUrl}/support`),
-    scopesSupported: ["mcp:read", "mcp:write"]
-  }));
 
   app.get("/", (req: Request, res: Response) => {
     const viewer = (req as any).viewer as ReturnType<typeof loadSessionState>;
@@ -174,18 +309,65 @@ export function createHttpApp(config = loadAppConfig()) {
     res.redirect(next || "/");
   });
 
-  app.post("/register", (req: Request, res: Response) => {
-    const { email, password, display_name, organization_name, organization_slug, next } = req.body as Record<string, string>;
-    if (db.findUserByEmail(email)) {
-      res.type("html").status(409).send(loginPage("Účet s tímto e-mailem už existuje.", next));
+  app.post("/register", async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.is("application/x-www-form-urlencoded")) {
+      next();
       return;
     }
-    const user = db.createUser(email, hashPassword(password), display_name);
-    const organization = db.createOrganizationWithOwner(organization_name, organization_slug, user.id);
-    const session = db.createSession(user.id, organization.id);
-    setSessionCookie(res, config, session.id);
-    res.redirect(next || "/");
+
+    const {
+      email,
+      password,
+      organization_name,
+      next: nextUrl
+    } = req.body as Record<string, string>;
+
+    if (db.findUserByEmail(email)) {
+      res.type("html").status(409).send(loginPage("Účet s tímto e-mailem už existuje.", nextUrl));
+      return;
+    }
+
+    const managedConnection = normalizeManagedConnectionInput({
+      alias: "default",
+      base_url: req.body.base_url as string,
+      company_slug: req.body.company_slug as string,
+      username: req.body.username as string,
+      password: req.body.flexi_password as string,
+      default_format: "json"
+    });
+
+    try {
+      await verifyManagedConnectionInput(flexiClient, managedConnection);
+      const user = db.createUser(email, hashPassword(password), defaultDisplayNameFromEmail(email));
+      const organization = db.createOrganizationWithOwner(
+        organization_name,
+        createUniqueOrganizationSlug(db, organization_name),
+        user.id
+      );
+      storeManagedConnection({
+        db,
+        config,
+        organizationId: organization.id,
+        connection: managedConnection
+      });
+      const session = db.createSession(user.id, organization.id);
+      setSessionCookie(res, config, session.id);
+      res.redirect(nextUrl || "/");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.type("html").status(400).send(loginPage(message, nextUrl));
+    }
   });
+
+  app.use(mcpAuthRouter({
+    provider,
+    issuerUrl: new URL(config.appBaseUrl),
+    baseUrl: new URL(config.appBaseUrl),
+    resourceServerUrl: new URL(`${config.appBaseUrl}/mcp`),
+    resourceName: "ABRA Flexi ChatGPT App",
+    serviceDocumentationUrl: new URL(`${config.appBaseUrl}/docs`),
+    scopesSupported: ["mcp:read", "mcp:write"]
+  }));
 
   app.get("/logout", (req: Request, res: Response) => {
     const viewer = (req as any).viewer as ReturnType<typeof loadSessionState>;
@@ -291,70 +473,17 @@ export function createHttpApp(config = loadAppConfig()) {
       res.status(403).type("html").send(connectionFormPage(undefined, "Pouze owner/admin může přidávat připojení."));
       return;
     }
-    const { alias, base_url, company_slug, username, password, default_format } = req.body as Record<string, string>;
-    const normalizedCompanySlug = company_slug?.trim() ?? "";
-    const tempProfile = createTemporaryProfile({
-      alias,
-      baseUrl: base_url,
-      companySlug: normalizedCompanySlug,
-      defaultFormat: default_format === "xml" ? "xml" : "json",
-      username,
-      password
-    });
+    const managedConnection = normalizeManagedConnectionInput(req.body as Record<string, string>);
 
     try {
-      const companiesResponse = await flexiClient.request({
-        operation: "onboarding_check_companies",
-        profile: tempProfile,
-        method: "GET",
-        path: flexiClient.buildServerPath(tempProfile.defaultFormat),
-        format: tempProfile.defaultFormat
-      });
-      const evidenceResponse = normalizedCompanySlug
-        ? await flexiClient.request({
-            operation: "onboarding_check_evidence",
-            profile: tempProfile,
-            company: normalizedCompanySlug,
-            method: "GET",
-            path: flexiClient.buildCompanyPath(tempProfile, normalizedCompanySlug, "evidence-list"),
-            format: tempProfile.defaultFormat
-          })
-        : null;
-      if (!companiesResponse.ok || (normalizedCompanySlug && !evidenceResponse?.ok)) {
-        const issues = [
-          ...companiesResponse.errors,
-          ...(evidenceResponse?.errors ?? [])
-        ].join("; ") || "Flexi connection test failed.";
-        res.type("html").status(400).send(connectionFormPage(undefined, issues));
-        return;
-      }
-      if (!normalizedCompanySlug) {
-        const companyCount = companiesResponse.ok ? mapCompaniesToSummary(companiesResponse.data).length : 0;
-        if (companyCount === 0) {
-          res.type("html").status(400).send(connectionFormPage(undefined, "REST API účet nevrátil žádnou dostupnou firmu."));
-          return;
-        }
-      }
-
-      const encrypted = encryptJson(config, { username, password });
-      const connection = db.createConnection({
+      const message = await createManagedConnectionFromInput({
+        db,
+        config,
+        flexiClient,
         organizationId: viewer.session.active_org_id,
-        alias,
-        baseUrl: base_url,
-        companySlug: normalizedCompanySlug,
-        defaultFormat: default_format === "xml" ? "xml" : "json",
-        mode: "prod",
-        keyVersion: encrypted.keyVersion,
-        encryptedSecret: JSON.stringify(encrypted)
+        connection: managedConnection
       });
-      db.updateConnectionCheck(connection.id, true);
-      redirectWithMessage(
-        res,
-        "/connections/new",
-        normalizedCompanySlug
-          ? `Připojení '${alias}' bylo uloženo a ověřeno.`
-          : `Připojení '${alias}' bylo uloženo. Firmu budete vybírat dynamicky přes company_slug.`
-      );
+      redirectWithMessage(res, "/connections/new", message);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       res.type("html").status(400).send(connectionFormPage(undefined, message));
@@ -399,6 +528,33 @@ export function createHttpApp(config = loadAppConfig()) {
     }
 
     const connection = db.listConnections(grant.organization_id).find((item) => item.id === grant.connection_id);
+    const reportTarget = resolveReportDownloadTarget(grant.report_key, grant.report_path);
+    if (reportTarget.local_file) {
+      if (!existsSync(grant.report_path)) {
+        res.status(404).type("text/plain").send("The generated report file is no longer available.");
+        return;
+      }
+      const buffer = readFileSync(grant.report_path);
+      db.logAudit({
+        organization_id: grant.organization_id,
+        user_id: grant.user_id,
+        connection_id: grant.connection_id,
+        client_id: null,
+        action: reportTarget.auditAction,
+        status: "ok",
+        details_json: JSON.stringify({
+          token,
+          filename: grant.filename,
+          size_bytes: buffer.length
+        })
+      });
+      res.status(200);
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${grant.filename.replace(/"/g, "")}"`);
+      res.setHeader("Cache-Control", "private, no-store");
+      res.send(buffer);
+      return;
+    }
     if (!connection) {
       res.status(404).type("text/plain").send("The Flexi connection for this report is no longer available.");
       return;
@@ -409,8 +565,6 @@ export function createHttpApp(config = loadAppConfig()) {
       res.status(500).type("text/plain").send("The Flexi connection is missing credentials.");
       return;
     }
-    const reportTarget = resolveReportDownloadTarget(grant.report_key);
-
     try {
       const secret = decryptJson<{ username: string; password: string }>(config, JSON.parse(encryptedSecret));
       const profile = createTemporaryProfile({
