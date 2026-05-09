@@ -9,12 +9,11 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#039;");
 }
 
-function brandLockup(label: string): string {
+function brandLockup(): string {
   return `
     <div class="brand-lockup" data-reveal>
       <span class="brand-mark">AF</span>
       <div class="brand-copy">
-        <span class="eyebrow">${escapeHtml(label)}</span>
         <strong>ABRA Flexi</strong>
       </div>
     </div>
@@ -51,7 +50,6 @@ function listRow(title: string, meta: string, detail?: string, tone: "default" |
 }
 
 function workflowSection(options: {
-  eyebrow: string;
   title: string;
   description: string;
   capabilities: string[];
@@ -61,7 +59,6 @@ function workflowSection(options: {
     <section class="content-section workflow" data-reveal>
       <div class="section-head">
         <div>
-          <div class="eyebrow">${escapeHtml(options.eyebrow)}</div>
           <h2>${escapeHtml(options.title)}</h2>
         </div>
         <p>${escapeHtml(options.description)}</p>
@@ -291,26 +288,6 @@ export function pageTemplate(title: string, body: string): string {
     .brand-copy strong {
       font-size: 1.05rem;
       letter-spacing: -0.04em;
-    }
-
-    .badge,
-    .eyebrow {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      color: var(--brand-deep);
-      font-size: 0.76rem;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-    }
-
-    .badge {
-      width: fit-content;
-      padding: 0.42rem 0.62rem;
-      border-radius: var(--radius-md);
-      background: rgba(255, 255, 255, 0.88);
-      border: 1px solid var(--line);
     }
 
     h1,
@@ -699,10 +676,7 @@ export function homePage(viewer: AppViewerContext, connections: FlexiConnection[
 
   const userSummary = viewer.user
     ? `<div class="detail-rail">
-         <div>
-           <div class="eyebrow">Aktivní uživatel</div>
-           <h2>${escapeHtml(viewer.user.display_name)}</h2>
-         </div>
+         <h2>${escapeHtml(viewer.user.display_name)}</h2>
          <p>${escapeHtml(viewer.user.email)}</p>
          <div class="metric-strip">
            ${metric("Workspaces", String(viewer.organizations.length))}
@@ -711,10 +685,7 @@ export function homePage(viewer: AppViewerContext, connections: FlexiConnection[
          </div>
        </div>`
     : `<div class="detail-rail">
-         <div>
-           <div class="eyebrow">Přístup</div>
-           <h2>Nejste přihlášený.</h2>
-         </div>
+         <h2>Nejste přihlášený.</h2>
          <p>Přihlaste se a nastavte workspace, členy týmu a spravované Flexi připojení.</p>
        </div>`;
 
@@ -723,9 +694,8 @@ export function homePage(viewer: AppViewerContext, connections: FlexiConnection[
       <section class="hero">
         <div class="hero-grid">
           <div class="hero-copy">
-            ${brandLockup("ChatGPT App")}
+            ${brandLockup()}
             <div class="stack" data-reveal>
-              <span class="badge">Účetní workflow</span>
               <h1>ABRA Flexi v ChatGPT pro účetní tým.</h1>
               <p class="lede">Minimal interface pro přihlášení, správu workspace a bezpečné Flexi onboarding flow. Přístupové údaje se drží v aplikaci, ne v promptu.</p>
             </div>
@@ -734,9 +704,7 @@ export function homePage(viewer: AppViewerContext, connections: FlexiConnection[
               viewer.user
                 ? { href: `/orgs/${encodeURIComponent(viewer.activeOrganization?.id ?? "")}/settings`, label: "Nastavení workspace", secondary: true }
                 : { href: "/login", label: "Přihlásit" },
-              viewer.user
-                ? { href: "/logout", label: "Odhlásit", secondary: true }
-                : { href: "/review/demo", label: "Reviewer demo", secondary: true }
+              ...(viewer.user ? [{ href: "/logout", label: "Odhlásit", secondary: true }] : [])
             ])}
           </div>
           <aside class="hero-panel" data-reveal>
@@ -748,7 +716,6 @@ export function homePage(viewer: AppViewerContext, connections: FlexiConnection[
       <section class="content-section" data-reveal>
         <div class="section-head">
           <div>
-            <div class="eyebrow">Workspace</div>
             <h2>Organizace a připojení</h2>
           </div>
           <p>První plocha ukazuje, co je připravené pro práci v ChatGPT a kde je potřeba doplnit konfiguraci.</p>
@@ -757,7 +724,6 @@ export function homePage(viewer: AppViewerContext, connections: FlexiConnection[
           <section class="panel">
             <div class="toolbar">
               <div>
-                <div class="eyebrow">Organizace</div>
                 <h3>Správa workspace</h3>
               </div>
               <a class="button secondary" href="/orgs/new">Nová organizace</a>
@@ -767,7 +733,6 @@ export function homePage(viewer: AppViewerContext, connections: FlexiConnection[
           <section class="panel">
             <div class="toolbar">
               <div>
-                <div class="eyebrow">Flexi</div>
                 <h3>Managed connections</h3>
               </div>
               ${viewer.activeOrganization ? `<a class="button secondary" href="/connections/new">Přidat připojení</a>` : ""}
@@ -787,15 +752,13 @@ export function loginPage(error?: string, next?: string): string {
         <div class="hero-grid auth-layout">
           <div class="auth-story">
             <div class="stack">
-              ${brandLockup("Secure access")}
+              ${brandLockup()}
               <div class="stack" data-reveal>
-                <span class="badge">Přihlášení</span>
                 <h1>Týmový přístup a bezpečný Flexi onboarding.</h1>
                 <p class="lede">ChatGPT pracuje jen nad autorizovaným workspace. Flexi přístup zadáváte až po přihlášení ve spravovaném formuláři.</p>
               </div>
             </div>
             <div class="panel" data-reveal>
-              <div class="eyebrow">Co dostanete po přihlášení</div>
               <div class="keypoints">
                 <div class="keypoint">
                   <strong>Správa organizace</strong>
@@ -817,7 +780,6 @@ export function loginPage(error?: string, next?: string): string {
             <section class="panel" data-reveal>
               <div class="section-head">
                 <div>
-                  <div class="eyebrow">Sign in</div>
                   <h2>Vrátit se do workspace</h2>
                 </div>
               </div>
@@ -833,7 +795,6 @@ export function loginPage(error?: string, next?: string): string {
             <section class="panel" data-reveal>
               <div class="section-head">
                 <div>
-                  <div class="eyebrow">Register</div>
                   <h2>Vytvořit nový účet</h2>
                 </div>
               </div>
@@ -867,9 +828,8 @@ export function organizationSettingsPage(
       <section class="hero">
         <div class="hero-grid">
           <div class="hero-copy">
-            ${brandLockup("Workspace")}
+            ${brandLockup()}
             <div class="stack" data-reveal>
-              <span class="badge">Nastavení</span>
               <h1>${escapeHtml(org.name)}</h1>
               <p class="lede">Správa členů týmu, rolí a ověřených Flexi připojení v rámci jednoho workspace.</p>
               <p class="mono">${escapeHtml(org.slug)}</p>
@@ -881,10 +841,7 @@ export function organizationSettingsPage(
           </div>
           <aside class="hero-panel" data-reveal>
             <div class="detail-rail">
-              <div>
-                <div class="eyebrow">Přehled</div>
-                <h2>Workspace status</h2>
-              </div>
+              <h2>Workspace status</h2>
               <div class="metric-strip">
                 ${metric("Členové", String(members.length))}
                 ${metric("Připojení", String(connections.length))}
@@ -900,7 +857,6 @@ export function organizationSettingsPage(
           <section class="panel">
             <div class="section-head">
               <div>
-                <div class="eyebrow">Tým</div>
                 <h2>Členové</h2>
               </div>
             </div>
@@ -909,7 +865,6 @@ export function organizationSettingsPage(
               ${members.map((member) => listRow(member.display_name, member.email, `${member.role} · ${member.status}`)).join("")}
             </ul>
             <div class="section">
-              <div class="eyebrow">Pozvánka</div>
               <h3>Pozvat člena</h3>
               <form method="post" action="/orgs/${encodeURIComponent(org.id)}/invite">
                 <label>E-mail<input type="email" name="email" required /></label>
@@ -927,7 +882,6 @@ export function organizationSettingsPage(
           <section class="panel">
             <div class="section-head">
               <div>
-                <div class="eyebrow">Flexi</div>
                 <h2>Připojení</h2>
               </div>
             </div>
@@ -957,19 +911,15 @@ export function connectionFormPage(message?: string, error?: string): string {
       <section class="hero">
         <div class="hero-grid">
           <div class="hero-copy">
-            ${brandLockup("Onboarding")}
+            ${brandLockup()}
             <div class="stack" data-reveal>
-              <span class="badge">Managed connection</span>
               <h1>Přidat ověřené Flexi připojení.</h1>
               <p class="lede">V1 cílí na cloudové ABRA Flexi instance dostupné po HTTPS. Použijte dedikovaného REST API uživatele a otestujte spojení před uložením.</p>
             </div>
           </div>
           <aside class="hero-panel" data-reveal>
             <div class="detail-rail">
-              <div>
-                <div class="eyebrow">Postup</div>
-                <h2>Co bude aplikace kontrolovat</h2>
-              </div>
+              <h2>Co bude aplikace kontrolovat</h2>
               <div class="keypoints">
                 <div class="keypoint">
                   <strong>Dostupnost instanci</strong>
@@ -1013,7 +963,6 @@ export function connectionFormPage(message?: string, error?: string): string {
           <section class="panel">
             <div class="section-head">
               <div>
-                <div class="eyebrow">Poznámka</div>
                 <h2>Doporučené nastavení</h2>
               </div>
             </div>
@@ -1035,9 +984,8 @@ export function legalPage(title: string, paragraphs: string[]): string {
       <section class="hero">
         <div class="hero-grid">
           <div class="hero-copy">
-            ${brandLockup("Legal")}
+            ${brandLockup()}
             <div class="stack" data-reveal>
-              <span class="badge">Policy</span>
               <h1>${escapeHtml(title)}</h1>
             </div>
           </div>
@@ -1063,16 +1011,14 @@ export function supportPage(): string {
       <section class="hero">
         <div class="hero-grid">
           <div class="hero-copy">
-            ${brandLockup("Návod")}
+            ${brandLockup()}
             <div class="stack" data-reveal>
-              <span class="badge">Přesunuto</span>
               <h1>Podpora je nově součástí Návodu.</h1>
               <p class="lede">Všechny informace o supportu, reviewer účtu a provozním kontaktu najdete přímo na stránce Návod.</p>
             </div>
           </div>
           <aside class="hero-panel" data-reveal>
             <div class="detail-rail">
-              <div class="eyebrow">Pokračovat</div>
               <h2>Otevřít Návod</h2>
               <p>Přejděte na jednotnou stránku s workflow i support informacemi.</p>
               <div class="actions"><a class="button" href="/docs">Návod</a></div>
@@ -1090,20 +1036,17 @@ export function docsPage(): string {
       <section class="hero">
         <div class="hero-grid">
           <div class="hero-copy">
-            ${brandLockup("Návod")}
+            ${brandLockup()}
             <div class="stack" data-reveal>
-              <span class="badge">Jak pracovat</span>
               <h1>Praktický průvodce pro účetní tým v ChatGPT.</h1>
               <p class="lede">Zaměřeno na reálné workflow: triáž, DPH, HR, cashflow, nesrovnalosti a přípravu dokladů bez ručního proklikávání ve Flexi.</p>
             </div>
             ${actionLinks([
-              { href: "/", label: "Dashboard", secondary: true },
-              { href: "/review/demo", label: "Reviewer demo", secondary: true }
+              { href: "/", label: "Dashboard", secondary: true }
             ])}
           </div>
           <aside class="hero-panel" data-reveal>
             <div class="detail-rail">
-              <div class="eyebrow">Základní pojmy</div>
               <ul class="mini-list">
                 <li><strong>Workspace</strong> drží členy týmu a uložená připojení.</li>
                 <li><strong>Connection alias</strong> je jméno spravovaného Flexi připojení.</li>
@@ -1116,7 +1059,6 @@ export function docsPage(): string {
       </section>
 
       ${workflowSection({
-        eyebrow: "Workflow 01",
         title: "Ranní triáž a oficiální exporty",
         description: "Nejsilnější vstup pro rychlý přehled priorit, rizik a oficiálních PDF exportů bez ručního procházení Flexi.",
         capabilities: [
@@ -1134,7 +1076,6 @@ export function docsPage(): string {
       <section class="content-section" data-reveal>
         <div class="panel-grid">
           <section class="panel">
-            <div class="eyebrow">Zadávání úkolů</div>
             <h2>Jak psát dotazy</h2>
             <ul class="mini-list">
               <li>Napište vždy co chcete zjistit, ne jaký tool se má spustit.</li>
@@ -1145,7 +1086,6 @@ export function docsPage(): string {
             </ul>
           </section>
           <section class="panel">
-            <div class="eyebrow">Bezpečnost</div>
             <h2>Co nedělat</h2>
             <ul class="mini-list">
               <li>Nevkládejte do promptu hesla, API údaje ani interní citlivé poznámky.</li>
@@ -1160,13 +1100,11 @@ export function docsPage(): string {
       <section class="content-section" data-reveal>
         <div class="panel-grid">
           <section class="panel">
-            <div class="eyebrow">Podpora</div>
             <h2>Support a reviewer přístup</h2>
             <p>Primární support je e-mail uvedený v <span class="mono">SUPPORT_EMAIL</span>. Slouží jako hlavní kontakt pro běžný provoz i pro OpenAI review.</p>
             <p class="section">Pro App Directory submission použijte demo účet bez 2FA a přiložte screenshoty onboarding flow, přidání Flexi connection a MCP test promptů.</p>
           </section>
           <section class="panel">
-            <div class="eyebrow">Reviewer</div>
             <h2>Co má být připravené</h2>
             <ul class="mini-list">
               <li>demo účet bez 2FA blokátorů</li>
@@ -1179,7 +1117,6 @@ export function docsPage(): string {
       </section>
 
       ${workflowSection({
-        eyebrow: "Workflow 02",
         title: "Personalistika a zaměstnanci",
         description: "Rychlé odpovědi nad zaměstnanci, pracovními poměry a HR přehledy pro každodenní personální dotazy.",
         capabilities: [
@@ -1195,7 +1132,6 @@ export function docsPage(): string {
       })}
 
       ${workflowSection({
-        eyebrow: "Workflow 03",
         title: "DPH a období",
         description: "Rychlý přehled za zvolené období a orientace před měsíční uzávěrkou. Vhodné pro první kontrolu, ne jako náhrada formálního podání.",
         capabilities: [
@@ -1211,7 +1147,6 @@ export function docsPage(): string {
       })}
 
       ${workflowSection({
-        eyebrow: "Workflow 04",
         title: "Cashflow a priority",
         description: "Denní fronta účetního týmu: co je po splatnosti, co je potřeba zaplatit nebo urgovat a kde vzniká finanční riziko.",
         capabilities: [
@@ -1227,7 +1162,6 @@ export function docsPage(): string {
       })}
 
       ${workflowSection({
-        eyebrow: "Workflow 05",
         title: "Kontrola plateb a nesrovnalostí",
         description: "Hledá případy, které stojí za ruční kontrolu: nesedící úhrady, chybějící párování nebo problémové doklady.",
         capabilities: [
@@ -1243,7 +1177,6 @@ export function docsPage(): string {
       })}
 
       ${workflowSection({
-        eyebrow: "Workflow 06",
         title: "Příprava dokladů",
         description: "Připraví draft faktury z běžného zadání, dohledá partnera a položky a vrátí přesně, co ještě chybí.",
         capabilities: [
@@ -1261,7 +1194,6 @@ export function docsPage(): string {
       <section class="content-section" data-reveal>
         <div class="panel-grid">
           <section class="panel">
-            <div class="eyebrow">Multi-company</div>
             <h2>Jak pracovat s více firmami</h2>
             <ul class="mini-list">
               <li>Řekněte „ukaž firmy dostupné pro connection alias Abra-Albac“.</li>
@@ -1270,7 +1202,6 @@ export function docsPage(): string {
             </ul>
           </section>
           <section class="panel">
-            <div class="eyebrow">Tipy</div>
             <h2>Co funguje nejlépe</h2>
             <ul class="mini-list">
               <li>Pište krátké, konkrétní úkoly. Jedna otázka bývá lepší než pět požadavků najednou.</li>
@@ -1280,38 +1211,6 @@ export function docsPage(): string {
             </ul>
           </section>
         </div>
-      </section>
-    </main>
-  `);
-}
-
-export function reviewPage(): string {
-  return pageTemplate("Reviewer demo", `
-    <main class="page">
-      <section class="hero">
-        <div class="hero-grid">
-          <div class="hero-copy">
-            ${brandLockup("Reviewer demo")}
-            <div class="stack" data-reveal>
-              <span class="badge">Walkthrough</span>
-              <h1>Review-ready průchod aplikací.</h1>
-              <p class="lede">Stručný checklist pro manuální ověření OAuth flow, workspace konfigurace a bezpečnosti write nástrojů.</p>
-            </div>
-          </div>
-          <aside class="hero-panel" data-reveal>
-            <p>Reviewer má projít demo účet, dostupné připojení, OAuth autorizaci a golden prompts bez interních debug payloadů.</p>
-          </aside>
-        </div>
-      </section>
-      <section class="content-section" data-reveal>
-        <section class="panel">
-          <ol class="mini-list">
-            <li>Přihlaste se demo účtem z deployment dokumentace.</li>
-            <li>Ověřte, že organizace „Review Demo Organization“ obsahuje alespoň jedno Flexi cloud connection.</li>
-            <li>Připojte app v ChatGPT Developer Mode, dokončete OAuth flow a spusťte golden prompts.</li>
-            <li>Zkontrolujte, že write nástroje vyžadují potvrzovací token a nevrací interní debug metadata.</li>
-          </ol>
-        </section>
       </section>
     </main>
   `);

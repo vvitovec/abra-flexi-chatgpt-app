@@ -30,6 +30,5 @@ check "/login" "200"
 check "/legal/privacy" "200"
 check "/legal/terms" "200"
 check "/support" "200"
-check "/review/demo" "200"
 
 echo "Production HTTP checks passed for ${BASE_URL}"

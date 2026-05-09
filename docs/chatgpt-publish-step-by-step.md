@@ -22,7 +22,7 @@
    - `/login`
    - `/legal/privacy`
    - `/support`
-   - `/review/demo`
+   - `/docs`
 
 ## 3. Deploy na Ubuntu server
 

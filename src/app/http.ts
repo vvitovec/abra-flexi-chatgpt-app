@@ -6,7 +6,7 @@ import cors from "cors";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { mcpAuthRouter, getOAuthProtectedResourceMetadataUrl } from "@modelcontextprotocol/sdk/server/auth/router.js";
 import { requireBearerAuth } from "@modelcontextprotocol/sdk/server/auth/middleware/bearerAuth.js";
-import { pageTemplate, homePage, loginPage, organizationSettingsPage, connectionFormPage, legalPage, reviewPage, supportPage, docsPage } from "./html.js";
+import { pageTemplate, homePage, loginPage, organizationSettingsPage, connectionFormPage, legalPage, supportPage, docsPage } from "./html.js";
 import { loadAppConfig, type AppConfig } from "./config.js";
 import { AppDatabase } from "./db.js";
 import { createPublicFlexiMcpServer } from "./flexi-mcp-server.js";
@@ -386,7 +386,7 @@ export function createHttpApp(config = loadAppConfig()) {
     }
     res.type("html").send(pageTemplate("Nová organizace", `
       <section class="hero card">
-        <div class="stack"><span class="badge">Workspace</span><h1>Nová organizace</h1></div>
+        <div class="stack"><h1>Nová organizace</h1></div>
       </section>
       <div class="grid"><section class="card section">
         <form method="post" action="/orgs/new">
@@ -513,10 +513,6 @@ export function createHttpApp(config = loadAppConfig()) {
 
   app.get("/docs", (_req: Request, res: Response) => {
     res.type("html").send(docsPage());
-  });
-
-  app.get("/review/demo", (_req: Request, res: Response) => {
-    res.type("html").send(reviewPage());
   });
 
   app.get("/downloads/reports/:token", async (req: Request, res: Response) => {

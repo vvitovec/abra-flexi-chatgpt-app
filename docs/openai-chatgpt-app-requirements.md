@@ -11,7 +11,7 @@
 
 - `POST /mcp`
 - OAuth metadata a auth/token/revoke endpoints na stejné veřejné doméně
-- `privacy policy`, `terms`, `support`, `review demo`
+- `privacy policy`, `terms`, `support`, `docs`
 
 ## Co musí být připravené pro App Directory
 

@@ -211,3 +211,37 @@ describe("auth routes", () => {
     }
   });
 });
+
+describe("public pages", () => {
+  it("does not expose the removed reviewer demo page or links", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "flexi-app-http-public-"));
+    cleanupDirs.push(dir);
+    const config = makeConfig(dir);
+    const { app } = createHttpApp(config);
+    const server = app.listen(0);
+
+    try {
+      const port = (server.address() as AddressInfo).port;
+      const home = await getTextResponse(`http://127.0.0.1:${port}/`);
+      const docs = await getTextResponse(`http://127.0.0.1:${port}/docs`);
+      const reviewDemo = await getTextResponse(`http://127.0.0.1:${port}/review/demo`);
+
+      expect(home.status).toBe(200);
+      expect(home.body).not.toContain("Účetní workflow");
+      expect(home.body).not.toContain("Reviewer demo");
+      expect(home.body).not.toContain("/review/demo");
+      expect(home.body).not.toContain("class=\"badge\"");
+      expect(home.body).not.toContain("class=\"eyebrow\"");
+      expect(docs.status).toBe(200);
+      expect(docs.body).not.toContain("Reviewer demo");
+      expect(docs.body).not.toContain("/review/demo");
+      expect(docs.body).not.toContain("class=\"badge\"");
+      expect(docs.body).not.toContain("class=\"eyebrow\"");
+      expect(reviewDemo.status).toBe(404);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
+    }
+  });
+});

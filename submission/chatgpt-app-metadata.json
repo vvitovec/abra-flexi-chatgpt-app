@@ -6,7 +6,7 @@
   "privacy_policy_url": "https://flexi.example.com/legal/privacy",
   "terms_of_use_url": "https://flexi.example.com/legal/terms",
   "support_url": "https://flexi.example.com/support",
-  "oauth_instructions_url": "https://flexi.example.com/review/demo",
+  "oauth_instructions_url": "https://flexi.example.com/docs",
   "mcp_url": "https://flexi.example.com/mcp",
   "oauth_issuer_url": "https://flexi.example.com",
   "icon_path": "assets/chatgpt-app-icon.svg"
