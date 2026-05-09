@@ -89,29 +89,34 @@ export function pageTemplate(title: string, body: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${escapeHtml(title)}</title>
   <style>
-    @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap");
+    @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Public+Sans:wght@400;500;600;700&display=swap");
 
     :root {
-      --bg: #f3f7fc;
-      --bg-strong: #edf3fa;
-      --surface: rgba(255, 255, 255, 0.92);
-      --surface-soft: rgba(248, 251, 255, 0.84);
-      --ink: #182435;
-      --muted: #66768a;
-      --line: rgba(64, 96, 134, 0.14);
-      --line-strong: rgba(64, 96, 134, 0.24);
-      --brand: #5e89bb;
-      --brand-deep: #466f9f;
-      --brand-soft: rgba(94, 137, 187, 0.12);
+      --bg: #f6f8fb;
+      --surface: #ffffff;
+      --surface-soft: #f9fbfd;
+      --ink: #1d2733;
+      --muted: #5f6d7c;
+      --line: rgba(63, 78, 96, 0.16);
+      --line-strong: rgba(63, 78, 96, 0.28);
+      --brand: #4f79a8;
+      --brand-deep: #365f8e;
+      --brand-soft: rgba(79, 121, 168, 0.1);
       --danger: #b4544b;
       --warn: #98763d;
       --radius-xl: 10px;
       --radius-lg: 8px;
       --radius-md: 6px;
-      --content: 1120px;
-      --font-display: "Manrope", sans-serif;
-      --font-body: "Manrope", sans-serif;
-      --font-mono: "IBM Plex Mono", monospace;
+      --content: 1080px;
+      --space-xs: 0.5rem;
+      --space-sm: 0.75rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --space-2xl: 3rem;
+      --font-display: "Public Sans", system-ui, sans-serif;
+      --font-body: "Public Sans", system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, monospace;
     }
 
     * {
@@ -127,22 +132,16 @@ export function pageTemplate(title: string, body: string): string {
       font-family: var(--font-body);
       color: var(--ink);
       min-height: 100vh;
-      background:
-        radial-gradient(circle at 85% 8%, rgba(94, 137, 187, 0.16), transparent 24%),
-        linear-gradient(180deg, #f8fbff 0%, var(--bg) 48%, var(--bg-strong) 100%);
+      background: var(--bg);
       position: relative;
       overflow-x: hidden;
+      font-size: 16px;
+      font-kerning: normal;
+      text-rendering: optimizeLegibility;
     }
 
     body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.72), transparent 28%),
-        radial-gradient(circle at 15% 75%, rgba(94, 137, 187, 0.08), transparent 24%);
-      opacity: 0.9;
+      content: none;
     }
 
     a {
@@ -154,26 +153,26 @@ export function pageTemplate(title: string, body: string): string {
     .shell {
       width: min(var(--content), calc(100vw - 40px));
       margin: 0 auto;
-      padding: 28px 0 52px;
+      padding: var(--space-xl) 0 var(--space-2xl);
       position: relative;
     }
 
     .page {
       display: grid;
-      gap: 40px;
+      gap: var(--space-2xl);
     }
 
     .hero {
       position: relative;
-      padding: 8px 0 28px;
+      padding: var(--space-sm) 0 var(--space-xl);
       border-bottom: 1px solid var(--line);
     }
 
     .hero-grid,
     .split {
       display: grid;
-      grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
-      gap: 40px;
+      grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr);
+      gap: var(--space-2xl);
       align-items: start;
     }
 
@@ -184,12 +183,12 @@ export function pageTemplate(title: string, body: string): string {
     .auth-story {
       display: grid;
       align-content: start;
-      gap: 28px;
+      gap: var(--space-xl);
     }
 
     .auth-forms {
       display: grid;
-      gap: 18px;
+      gap: var(--space-lg);
       align-content: start;
     }
 
@@ -201,7 +200,7 @@ export function pageTemplate(title: string, body: string): string {
       border-radius: 0;
       background: transparent;
       box-shadow: none;
-      padding: 18px 0 0;
+      padding: var(--space-lg) 0 0;
       position: relative;
     }
 
@@ -210,7 +209,7 @@ export function pageTemplate(title: string, body: string): string {
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       background: var(--surface-soft);
-      padding: 20px;
+      padding: var(--space-lg);
     }
 
     .hero-panel {
@@ -223,9 +222,9 @@ export function pageTemplate(title: string, body: string): string {
     }
 
     .section {
-      margin-top: 24px;
+      margin-top: var(--space-lg);
       border-top: 1px solid var(--line);
-      padding-top: 18px;
+      padding-top: var(--space-lg);
     }
 
     .grid,
@@ -233,7 +232,7 @@ export function pageTemplate(title: string, body: string): string {
     .doc-grid,
     .workflow-grid {
       display: grid;
-      gap: 36px;
+      gap: var(--space-xl);
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
@@ -241,17 +240,17 @@ export function pageTemplate(title: string, body: string): string {
     .stack,
     form {
       display: grid;
-      gap: 14px;
+      gap: var(--space-md);
     }
 
     .section-head,
     .toolbar {
       display: flex;
-      gap: 14px;
+      gap: var(--space-md);
       justify-content: space-between;
       align-items: start;
       flex-wrap: wrap;
-      margin-bottom: 18px;
+      margin-bottom: var(--space-lg);
     }
 
     .section-head p,
@@ -263,21 +262,21 @@ export function pageTemplate(title: string, body: string): string {
     .brand-lockup {
       display: inline-flex;
       align-items: center;
-      gap: 12px;
+      gap: var(--space-sm);
     }
 
     .brand-mark {
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       border-radius: var(--radius-lg);
-      background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+      background: var(--brand);
       color: #f8fbff;
-      font-size: 0.84rem;
-      font-weight: 800;
-      letter-spacing: 0.08em;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
     }
 
     .brand-copy {
@@ -286,8 +285,8 @@ export function pageTemplate(title: string, body: string): string {
     }
 
     .brand-copy strong {
-      font-size: 1.05rem;
-      letter-spacing: -0.04em;
+      font-size: 1rem;
+      letter-spacing: -0.01em;
     }
 
     h1,
@@ -295,41 +294,43 @@ export function pageTemplate(title: string, body: string): string {
     h3 {
       margin: 0;
       font-family: var(--font-display);
-      letter-spacing: -0.06em;
-      line-height: 0.94;
-      font-weight: 800;
+      letter-spacing: -0.018em;
+      line-height: 1.12;
+      font-weight: 700;
     }
 
     h1 {
-      font-size: clamp(2rem, 5.4vw, 3.55rem);
-      max-width: 8.2ch;
+      font-size: 2.5rem;
+      max-width: 17ch;
     }
 
     h2 {
-      font-size: clamp(1.4rem, 3vw, 2rem);
+      font-size: 1.55rem;
+      max-width: 24ch;
     }
 
     h3 {
       font-size: 1rem;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.01em;
+      line-height: 1.25;
     }
 
     p {
       margin: 0;
       color: var(--muted);
-      line-height: 1.66;
-      font-size: 0.97rem;
+      line-height: 1.62;
+      font-size: 1rem;
     }
 
     .lede {
-      max-width: 54ch;
-      font-size: 0.99rem;
+      max-width: 58ch;
+      font-size: 1rem;
     }
 
     .hero-copy {
       display: grid;
       align-content: start;
-      gap: 20px;
+      gap: var(--space-lg);
       min-height: auto;
     }
 
@@ -339,33 +340,33 @@ export function pageTemplate(title: string, body: string): string {
 
     .metric-strip {
       display: grid;
-      gap: 14px;
+      gap: var(--space-md);
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      padding-top: 4px;
+      padding-top: var(--space-xs);
     }
 
     .metric {
       display: grid;
-      gap: 6px;
-      padding-top: 14px;
+      gap: var(--space-xs);
+      padding-top: var(--space-sm);
       border-top: 1px solid var(--line);
     }
 
     .metric-label {
       color: var(--muted);
       font-size: 0.74rem;
-      letter-spacing: 0.14em;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
     }
 
     .metric strong {
-      font-size: 1.4rem;
-      letter-spacing: -0.06em;
+      font-size: 1.25rem;
+      letter-spacing: -0.018em;
     }
 
     .actions {
       display: flex;
-      gap: 10px;
+      gap: var(--space-sm);
       flex-wrap: wrap;
       align-items: center;
     }
@@ -377,9 +378,9 @@ export function pageTemplate(title: string, body: string): string {
       border-radius: var(--radius-lg);
       background: var(--brand);
       color: #f8fbff;
-      padding: 11px 16px;
+      padding: 0.68rem 0.95rem;
       font: inherit;
-      font-weight: 700;
+      font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
@@ -408,10 +409,10 @@ export function pageTemplate(title: string, body: string): string {
 
     label {
       display: grid;
-      gap: 8px;
-      font-size: 0.86rem;
-      font-weight: 700;
-      letter-spacing: 0.005em;
+      gap: var(--space-xs);
+      font-size: 0.92rem;
+      font-weight: 600;
+      letter-spacing: 0;
       color: var(--ink);
     }
 
@@ -421,8 +422,8 @@ export function pageTemplate(title: string, body: string): string {
       width: 100%;
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
-      background: rgba(255, 255, 255, 0.9);
-      padding: 12px 14px;
+      background: var(--surface);
+      padding: 0.72rem 0.85rem;
       font: inherit;
       color: var(--ink);
       transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
@@ -434,7 +435,7 @@ export function pageTemplate(title: string, body: string): string {
       outline: none;
       border-color: rgba(94, 137, 187, 0.5);
       box-shadow: 0 0 0 3px rgba(94, 137, 187, 0.12);
-      background: #fff;
+      background: var(--surface);
     }
 
     textarea {
@@ -458,8 +459,8 @@ export function pageTemplate(title: string, body: string): string {
     .row,
     .list li {
       border-top: 1px solid var(--line);
-      padding-top: 12px;
-      padding-bottom: 12px;
+      padding-top: var(--space-sm);
+      padding-bottom: var(--space-sm);
       transition: border-color 180ms ease, color 180ms ease;
     }
 
@@ -476,12 +477,12 @@ export function pageTemplate(title: string, body: string): string {
 
     .row-copy {
       display: grid;
-      gap: 4px;
+      gap: 0.35rem;
     }
 
     .row-copy strong {
       font-size: 1rem;
-      letter-spacing: -0.03em;
+      letter-spacing: -0.01em;
     }
 
     .row-meta,
@@ -491,21 +492,22 @@ export function pageTemplate(title: string, body: string): string {
 
     .row-detail {
       font-size: 0.92rem;
+      line-height: 1.5;
       color: var(--muted);
     }
 
     .notice,
     .tip {
-      padding: 12px 14px;
+      padding: var(--space-sm) var(--space-md);
       border-radius: var(--radius-md);
       border: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.78);
+      background: var(--surface);
       color: var(--ink);
     }
 
     .notice {
       border-color: rgba(94, 137, 187, 0.18);
-      background: rgba(94, 137, 187, 0.08);
+      background: var(--brand-soft);
     }
 
     .tip {
@@ -517,24 +519,24 @@ export function pageTemplate(title: string, body: string): string {
       margin: 0;
       padding-left: 1.1rem;
       display: grid;
-      gap: 10px;
+      gap: var(--space-sm);
       color: var(--muted);
-      line-height: 1.6;
+      line-height: 1.58;
     }
 
     .example-stack {
       display: grid;
-      gap: 10px;
+      gap: var(--space-sm);
     }
 
     .example {
       border-radius: var(--radius-md);
-      padding: 13px 14px;
+      padding: var(--space-sm) var(--space-md);
       border: 1px solid var(--line);
-      background: rgba(248, 251, 255, 0.88);
+      background: var(--surface);
       color: var(--ink);
       font-family: var(--font-mono);
-      font-size: 0.9rem;
+      font-size: 0.875rem;
       line-height: 1.6;
     }
 
@@ -553,27 +555,27 @@ export function pageTemplate(title: string, body: string): string {
 
     .detail-rail {
       display: grid;
-      gap: 14px;
+      gap: var(--space-md);
     }
 
     .keypoints {
       display: grid;
-      gap: 12px;
+      gap: var(--space-md);
     }
 
     .keypoint {
       display: grid;
-      gap: 4px;
-      padding-top: 12px;
+      gap: 0.35rem;
+      padding-top: var(--space-sm);
       border-top: 1px solid var(--line);
     }
 
     .site-footer {
       display: flex;
       justify-content: space-between;
-      gap: 12px;
+      gap: var(--space-sm);
       flex-wrap: wrap;
-      padding-top: 20px;
+      padding-top: var(--space-lg);
       border-top: 1px solid var(--line);
       color: var(--muted);
       font-size: 0.88rem;
@@ -605,7 +607,7 @@ export function pageTemplate(title: string, body: string): string {
     @media (max-width: 720px) {
       .shell {
         width: min(var(--content), calc(100vw - 24px));
-        padding-top: 12px;
+        padding-top: var(--space-md);
       }
 
       .hero,
@@ -616,7 +618,12 @@ export function pageTemplate(title: string, body: string): string {
       }
 
       h1 {
-        font-size: clamp(1.7rem, 10vw, 2.6rem);
+        font-size: 2rem;
+        max-width: 18ch;
+      }
+
+      h2 {
+        font-size: 1.35rem;
       }
 
       .actions {
@@ -694,10 +701,10 @@ export function homePage(viewer: AppViewerContext, connections: FlexiConnection[
       <section class="hero">
         <div class="hero-grid">
           <div class="hero-copy">
-            ${brandLockup()}
-            <div class="stack" data-reveal>
-              <h1>ABRA Flexi v ChatGPT pro účetní tým.</h1>
-              <p class="lede">Minimal interface pro přihlášení, správu workspace a bezpečné Flexi onboarding flow. Přístupové údaje se drží v aplikaci, ne v promptu.</p>
+              ${brandLockup()}
+              <div class="stack" data-reveal>
+                <h1>ABRA Flexi v ChatGPT pro účetní tým.</h1>
+              <p class="lede">Jednoduché rozhraní pro přihlášení, správu workspace a bezpečné napojení Flexi. Přístupové údaje zůstávají v aplikaci, ne v promptu.</p>
             </div>
             ${actionLinks([
               { href: "/docs", label: "Návod", secondary: true },
@@ -733,7 +740,7 @@ export function homePage(viewer: AppViewerContext, connections: FlexiConnection[
           <section class="panel">
             <div class="toolbar">
               <div>
-                <h3>Managed connections</h3>
+                <h3>Spravovaná připojení</h3>
               </div>
               ${viewer.activeOrganization ? `<a class="button secondary" href="/connections/new">Přidat připojení</a>` : ""}
             </div>
@@ -835,13 +842,13 @@ export function organizationSettingsPage(
               <p class="mono">${escapeHtml(org.slug)}</p>
             </div>
             ${actionLinks([
-              { href: "/", label: "Dashboard", secondary: true },
+              { href: "/", label: "Přehled", secondary: true },
               { href: "/connections/new", label: "Přidat Flexi připojení" }
             ])}
           </div>
           <aside class="hero-panel" data-reveal>
             <div class="detail-rail">
-              <h2>Workspace status</h2>
+              <h2>Stav workspace</h2>
               <div class="metric-strip">
                 ${metric("Členové", String(members.length))}
                 ${metric("Připojení", String(connections.length))}
@@ -1042,7 +1049,7 @@ export function docsPage(): string {
               <p class="lede">Zaměřeno na reálné workflow: triáž, DPH, HR, cashflow, nesrovnalosti a přípravu dokladů bez ručního proklikávání ve Flexi.</p>
             </div>
             ${actionLinks([
-              { href: "/", label: "Dashboard", secondary: true }
+              { href: "/", label: "Přehled", secondary: true }
             ])}
           </div>
           <aside class="hero-panel" data-reveal>
